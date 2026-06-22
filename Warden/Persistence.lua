@@ -15,10 +15,11 @@ local COMMIT_SCALARS = {
     "lastComp", "autoRaidDuringBuild", "autoSpec",
     "bloodlust", "aoe", "burn",
     "disperseDist", "minimapAngle", "masterScale", "activeTab",
+    "helpLastChapter",
 }
 
 -- Subtables preserved whole; always written so freshly-added keys survive.
-local COMMIT_SUBTABLES = { "comps", "playerFlags", "sword" }
+local COMMIT_SUBTABLES = { "comps", "playerFlags", "sword", "shield", "pocket" }
 
 -- ----------------------------------------------------------
 -- Schema init (idempotent)
@@ -45,6 +46,7 @@ local function initDB()
     if type(db.minimapAngle)         ~= "number"  then db.minimapAngle = 225 end
     if type(db.masterScale)          ~= "number"  then db.masterScale = 1.0 end
     if type(db.activeTab)            ~= "number"  then db.activeTab = 1 end
+    if type(db.helpLastChapter)      ~= "string"  then db.helpLastChapter = "intro" end
     if type(db.playerFlags)          ~= "table"   then db.playerFlags = {} end
 
     -- WardenSword (mid-fight HUD) persisted state.
@@ -61,12 +63,30 @@ local function initDB()
     if type(sw.hideMinimapCombat)  ~= "boolean" then sw.hideMinimapCombat  = false end
     if type(sw.alpha)              ~= "number"  then sw.alpha              = 1.00 end
 
+    -- WardenShield (discovery-command HUD) persisted state. Additive to the
+    -- schema; existing users get defaults applied on next login.
+    if type(db.shield) ~= "table" then db.shield = {} end
+    local sh = db.shield
+    if type(sh.pos)        ~= "table"   then sh.pos        = nil   end
+    if type(sh.locked)     ~= "boolean" then sh.locked     = false end
+    if type(sh.hidden)     ~= "boolean" then sh.hidden     = false end
+    if type(sh.captureSec) ~= "number"  then sh.captureSec = 5     end
+    if type(sh.exclusions) ~= "table"   then sh.exclusions = {}    end
+
+    -- WardenPocket (/wp WTS aggregator) persisted state.
+    if type(db.pocket) ~= "table" then db.pocket = {} end
+    local pk = db.pocket
+    if type(pk.autoTrade) ~= "boolean" then pk.autoTrade = true  end
+    if type(pk.fullAuto)  ~= "boolean" then pk.fullAuto  = false end
+    if type(pk.maxOffers) ~= "number"  then pk.maxOffers = 20    end
+    if type(pk.maxWait)   ~= "number"  then pk.maxWait   = 30    end
+
     -- Drop stale keys from prior schema versions.
     if db.density ~= nil then db.density = nil end
     if db.sword and db.sword.tone ~= nil then db.sword.tone = nil end
 
     -- Runtime-only defaults (not committed, never persisted).
-    db.interval       = 0.70
+    db.interval       = 0.90
     db.commandChannel = "SAY"
     db.addPattern     = ".warstormbot bot addclass %s"
 

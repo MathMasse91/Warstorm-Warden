@@ -98,6 +98,36 @@ That's how **Warden v1.0.0** happened. 👍
 - Auto show in combat
 - Density presets + transparency
 
+### 🛡️ WardenShield — `/wsh`
+
+![WardenShield](docs/images/wardenshield.webp)
+
+A floating **discovery & capture** panel for inspecting a single bot.
+
+- Target a bot, hit `[pick]` to lock it
+- `[los]` → list nearby usable objects · `[spells]` → list the bot's spellbook
+- Whisper replies are captured for a few seconds and turned into **clickable rows**
+- Click a row to act, based on the active mode:
+  - `cast` — cast that spell / use that object
+  - `on Y` — cast it on your next target · `on me` — cast it on yourself
+  - `ban` / `unban` — add/remove the spell from the bot's exclude list (`ss +/-`)
+- `hide gray` hides spells the bot can't actually use
+- Persistent **exclusions** view to manage everything you've banned
+- Player-flag guard — real players can never be picked
+
+### 💰 WardenPocket — `/wp`
+
+![WardenPocket](docs/images/pocket.webp)
+
+A hands-off **WTS auction** tool that sells to bot buyers for you.
+
+- Drop an item in the slot → `[WTS]` broadcasts it to General chat
+- Listens for whispered offers (`12g 21s` style) and **ranks bidders** highest-first
+- **Auto-invites the winner** when bids go quiet, hit your offer cap, or the timer runs out
+- Tunable: `Top` (max offers) and `Wait` (timeout seconds)
+- Trade banner: set quantity → it whispers the exact total to the winner
+- `[Stop]` freezes bidding, `[Clear]` resets and un-invites
+
 ### 📋 Presets
 
 - 11 built-in comps (Onyxia → ICC, 5 to 25 man)
@@ -159,6 +189,28 @@ That's how **Warden v1.0.0** happened. 👍
 | `/ws help`       | Print the full command list     |
 
 Direct HUD actions: `/ws summon · follow · stay · flee · aoe · burn · skull · bl`, plus role commands `/ws @tank|@heal|@dps atk|stay`.
+
+**WardenShield**
+
+| Command          | What it does                       |
+|------------------|------------------------------------|
+| `/wsh`           | Toggle the WardenShield panel      |
+| `/wsh show \| hide` | Explicit show / hide            |
+| `/wsh lock \| unlock` | Lock or unlock position        |
+| `/wsh reset`     | Reset position                     |
+| `/wsh clear`     | Wipe captured list + unlock target |
+| `/wsh los`       | Fire `los` discovery on the target |
+| `/wsh spells`    | Fire `spells` discovery on the target |
+| `/wsh help`      | Print the command list             |
+
+**WardenPocket**
+
+| Command          | What it does                          |
+|------------------|---------------------------------------|
+| `/wp`            | Toggle the WardenPocket HUD           |
+| `/wp show \| hide` | Explicit show / hide                |
+| `/wp ItemName`   | Toggle + pre-fill the item name field |
+| `/wardenpocket`  | Alias for `/wp`                       |
 
 **Logging**
 

@@ -1,5 +1,4 @@
-<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/">
-    <Bindings>
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
         <!-- Main window + tab shortcuts -->
         <Binding name="WARDEN_TOGGLE" header="WARDEN">
             if WARDEN_Toggle then WARDEN_Toggle() end
@@ -101,5 +100,11 @@
         <Binding name="WARDENSWORD_DPS_STAY">
             if WARDENSWORD_Run then WARDENSWORD_Run("@dps stay") end
         </Binding>
-    </Bindings>
+
+        <!-- ================================================== -->
+        <!-- WardenShield (discovery / capture HUD) bindings    -->
+        <!-- ================================================== -->
+        <Binding name="WARDENSHIELD_TOGGLE" header="WARDENSHIELD">
+            if WARDENSHIELD_Toggle then WARDENSHIELD_Toggle() end
+        </Binding>
 </Ui>

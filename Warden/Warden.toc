@@ -1,8 +1,8 @@
 ## Interface: 30300
 ## Title: Warden
-## Notes: Master command center for Warstorm 3.3.5a — specs, bots, comp, roster & raid controls in one tabbed window.
+## Notes: Master command center for Warstorm 3.3.5a - specs, bots, comp, roster & raid controls in one tabbed window.
 ## Author: UnrealTruth
-## Version: 1.0.0
+## Version: 1.1.0
 ## SavedVariables: WardenDB, WardenLog, WardenLogEnabled, WardenDebug
 ## OptionalDeps: Blizzard_BindingUI
 ## X-Credits: Forked from WSSM (Patchs & Valleriaa) + merges WarstormBotManager (Moroes), WBMLite and OptimalRaidComposer (both by Runshouse)
@@ -16,6 +16,8 @@ Persistence.lua
 Engine.lua
 WardenSword_Actions.lua
 WardenSword.lua
+Shield.lua
+Pocket.lua
 UI_Master.lua
 UI_TabSpec.lua
 UI_TabControls.lua

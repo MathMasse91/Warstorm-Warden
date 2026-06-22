@@ -89,6 +89,7 @@ ns.DebugCats = {
     "comp",     -- UI_TabComp save / load / build
     "controls", -- UI_TabControls send() sites
     "settings", -- UI_TabSettings toggle changes
+    "shield",   -- WardenShield discovery + capture lifecycle
 }
 
 local function catEnabled(cat)

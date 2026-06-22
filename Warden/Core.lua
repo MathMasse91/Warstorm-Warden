@@ -475,6 +475,283 @@ function ns.UI.Panel.Create(parent, w, h, headerText)
     return frame
 end
 
+-- =====================================================================
+-- Shared HUD primitives used by WardenShield and WardenPocket.
+-- Banner: conditional state strip under a header (armed / invited / etc).
+-- Segmented: a mutually-exclusive option row that reads as a single widget
+-- rather than 5 independent buttons.
+-- =====================================================================
+ns.UI.Banner = ns.UI.Banner or {}
+
+-- ns.UI.Banner.Create(parent, variant) -> frame
+--   frame:SetVariant("amber"|"green"|"red")
+--   frame:SetText(leftText, rightText)
+--   frame:SetPulse(on)
+function ns.UI.Banner.Create(parent, variant)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetHeight(16)
+
+    f:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = nil,
+    })
+
+    -- Two-layer gradient simulation since 3.3.5 lacks SetGradient.
+    local top = f:CreateTexture(nil, "BACKGROUND")
+    top:SetTexture("Interface\\Buttons\\WHITE8x8")
+    top:SetPoint("TOPLEFT",     f, "TOPLEFT",     0, 0)
+    top:SetPoint("TOPRIGHT",    f, "TOPRIGHT",    0, 0)
+    top:SetPoint("BOTTOMLEFT",  f, "LEFT",        0, 0)
+    top:SetPoint("BOTTOMRIGHT", f, "RIGHT",       0, 0)
+    f._gradTop = top
+
+    local bot = f:CreateTexture(nil, "BACKGROUND")
+    bot:SetTexture("Interface\\Buttons\\WHITE8x8")
+    bot:SetPoint("TOPLEFT",     f, "LEFT",         0, 0)
+    bot:SetPoint("TOPRIGHT",    f, "RIGHT",        0, 0)
+    bot:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",   0, 0)
+    bot:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",  0, 0)
+    f._gradBot = bot
+
+    -- Bottom 1px border in the variant rim color.
+    local border = f:CreateTexture(nil, "OVERLAY")
+    border:SetTexture("Interface\\Buttons\\WHITE8x8")
+    border:SetHeight(1)
+    border:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  0, 0)
+    border:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    f._border = border
+
+    -- Pulsing 6×6 blip on the left.
+    local blip = f:CreateTexture(nil, "ARTWORK")
+    blip:SetTexture("Interface\\Buttons\\WHITE8x8")
+    blip:SetSize(6, 6)
+    blip:SetPoint("LEFT", f, "LEFT", 10, 0)
+    f.blip = blip
+
+    local lblL = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lblL:SetPoint("LEFT", blip, "RIGHT", 6, 0)
+    f.lblL = lblL
+
+    local lblR = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lblR:SetPoint("RIGHT", f, "RIGHT", -10, 0)
+    lblR:SetJustifyH("RIGHT")
+    f.lblR = lblR
+
+    function f:SetVariant(v)
+        self._variant = v
+        local color
+        if v == "green" then color = ns.Tokens.green
+        elseif v == "red" then color = ns.Tokens.ink_red
+        else color = ns.Tokens.amber end
+        self._gradTop:SetVertexColor(color[1], color[2], color[3], 0.22)
+        self._gradBot:SetVertexColor(color[1], color[2], color[3], 0.06)
+        self._border:SetVertexColor(color[1], color[2], color[3], 0.40)
+        self.blip:SetVertexColor(color[1], color[2], color[3], 1)
+        self.lblL:SetTextColor(color[1], color[2], color[3], 1)
+        local gold = ns.Tokens.gold
+        self.lblR:SetTextColor(gold[1], gold[2], gold[3], 1)
+    end
+
+    function f:SetText(left, right)
+        self.lblL:SetText(left or "")
+        self.lblR:SetText(right or "")
+    end
+
+    function f:SetPulse(on)
+        if on then
+            self._pulseT = 0
+            self:SetScript("OnUpdate", function(self, elapsed)
+                self._pulseT = (self._pulseT or 0) + elapsed
+                local a = 0.4 + 0.6 * (0.5 + 0.5 * math.sin(self._pulseT * (math.pi * 2 / 1.4)))
+                self.blip:SetAlpha(a)
+            end)
+        else
+            self:SetScript("OnUpdate", nil)
+            self.blip:SetAlpha(1)
+        end
+    end
+
+    f:SetVariant(variant or "amber")
+    return f
+end
+
+ns.UI.Segmented = ns.UI.Segmented or {}
+
+-- ns.UI.Segmented.Create(parent, items, onChange) -> frame
+--   items = { {key, label, tooltip = {title, body}}, ... }  (5 max)
+--   onChange(key) — called when user clicks a different option
+--   frame:SetActive(key)        repaint, no onChange call
+--   frame:GetActive() -> key
+--   frame:SetDisabled(key, bool)
+function ns.UI.Segmented.Create(parent, items, onChange)
+    local f = CreateFrame("Frame", nil, parent)
+    f:SetHeight(22)
+    f:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    local T = ns.Tokens
+    f:SetBackdropColor(T.stone_mid[1], T.stone_mid[2], T.stone_mid[3], 1)
+    f:SetBackdropBorderColor(T.stone_rim[1], T.stone_rim[2], T.stone_rim[3], 1)
+
+    f._items   = items
+    f._buttons = {}
+    f._active  = items[1] and items[1].key or nil
+
+    local function paintAll()
+        for _, it in ipairs(items) do
+            local btn = f._buttons[it.key]
+            if btn then
+                local active = (it.key == f._active)
+                if active then
+                    btn:SetBackdropColor(T.stone_tile[1], T.stone_tile[2], T.stone_tile[3], 1)
+                    btn:SetBackdropBorderColor(T.gold_rim[1], T.gold_rim[2], T.gold_rim[3], 1)
+                    btn._fs:SetTextColor(T.gold[1], T.gold[2], T.gold[3], 1)
+                else
+                    btn:SetBackdropColor(0, 0, 0, 0)
+                    btn:SetBackdropBorderColor(0, 0, 0, 0)
+                    btn._fs:SetTextColor(T.gold_dim[1], T.gold_dim[2], T.gold_dim[3], 1)
+                end
+                if btn._disabled then
+                    btn._fs:SetTextColor(T.gold_dim[1] * 0.4, T.gold_dim[2] * 0.4, T.gold_dim[3] * 0.4, 1)
+                end
+            end
+        end
+    end
+    f._paintAll = paintAll
+
+    for i, it in ipairs(items) do
+        local b = CreateFrame("Button", nil, f)
+        b:SetBackdrop({
+            bgFile   = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        b:SetBackdropColor(0, 0, 0, 0)
+        b:SetBackdropBorderColor(0, 0, 0, 0)
+        b:EnableMouse(true)
+        b:RegisterForClicks("LeftButtonUp")
+
+        local fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetPoint("CENTER", b, "CENTER", 0, 0)
+        fs:SetText(it.label or it.key)
+        b._fs = fs
+
+        local hi = b:CreateTexture(nil, "HIGHLIGHT")
+        hi:SetTexture("Interface\\Buttons\\WHITE8x8")
+        hi:SetAllPoints(b)
+        hi:SetBlendMode("ADD")
+        hi:SetVertexColor(1, 1, 1, 0.10)
+        b:SetHighlightTexture(hi)
+
+        -- 1px separator drawn to the right of every button except the last.
+        if i < #items then
+            local sep = f:CreateTexture(nil, "OVERLAY")
+            sep:SetTexture("Interface\\Buttons\\WHITE8x8")
+            sep:SetVertexColor(T.stone_rim[1], T.stone_rim[2], T.stone_rim[3], 1)
+            sep:SetWidth(1)
+            b._sep = sep
+        end
+
+        local key = it.key
+        b:SetScript("OnClick", function()
+            if b._disabled then return end
+            if f._active ~= key then
+                f._active = key
+                paintAll()
+                if onChange then onChange(key) end
+            end
+        end)
+
+        if it.tooltip then
+            ns.UI.Tooltip.Attach(b, it.tooltip[1], it.tooltip[2], "ANCHOR_TOP")
+        end
+
+        f._buttons[it.key] = b
+    end
+
+    local function layout()
+        local n = #items
+        local w = f:GetWidth()
+        if n == 0 or w <= 0 then return end
+        local each = w / n
+        for i, it in ipairs(items) do
+            local b = f._buttons[it.key]
+            local x = math.floor((i - 1) * each + 0.5)
+            local nextX = math.floor(i * each + 0.5)
+            b:ClearAllPoints()
+            b:SetPoint("TOPLEFT",     f, "TOPLEFT", x, 0)
+            b:SetPoint("BOTTOMRIGHT", f, "TOPLEFT", nextX, -f:GetHeight())
+            if b._sep then
+                b._sep:ClearAllPoints()
+                b._sep:SetPoint("TOPLEFT",    b, "TOPRIGHT", -1, 0)
+                b._sep:SetPoint("BOTTOMLEFT", b, "BOTTOMRIGHT", -1, 0)
+            end
+        end
+    end
+    f._layout = layout
+    f:SetScript("OnSizeChanged", layout)
+
+    function f:SetActive(key)
+        if self._active ~= key then
+            self._active = key
+            paintAll()
+        end
+    end
+    function f:GetActive() return self._active end
+    function f:SetDisabled(key, dis)
+        local btn = self._buttons[key]
+        if btn then
+            btn._disabled = dis and true or false
+            btn:EnableMouse(not btn._disabled)
+            paintAll()
+        end
+    end
+
+    paintAll()
+    return f
+end
+
+-- =====================================================================
+-- RichText: parse inline markers used by the Help tab content table.
+-- Three markers, none nesting:
+--   |kbd[F]|         -> gold keycap escape
+--   |ck[/warden]|    -> warm-mono code escape
+--   |em[the moment]| -> dim parchment escape (no real italic on 3.3.5)
+-- "||kbd[" lets the author embed a literal pipe before a marker.
+-- Unknown markers are left verbatim - bad data should never crash the UI.
+-- =====================================================================
+ns.UI.RichText = ns.UI.RichText or {}
+
+local _RT_COLORS = {
+    kbd = "ffd100",  -- gold
+    ck  = "ffebbf",  -- text_warm
+    em  = "d9cdb0",  -- parchment
+}
+
+function ns.UI.RichText.Format(s)
+    if type(s) ~= "string" then return "" end
+    s = s:gsub("||", "\1")
+    s = s:gsub("|(%w+)%[([^%]]*)%]|", function(tag, body)
+        local c = _RT_COLORS[tag]
+        if not c then return "|" .. tag .. "[" .. body .. "]|" end
+        return "|cff" .. c .. body .. "|r"
+    end)
+    s = s:gsub("\1", "|")
+    return s
+end
+
+-- HairRule: 1px gold-rim divider. Caller anchors the returned Texture.
+function ns.UI.HairRule(parent, alpha)
+    local t = parent:CreateTexture(nil, "ARTWORK")
+    t:SetTexture("Interface\\Buttons\\WHITE8x8")
+    local r, g, b = ns.Tokens.gold_rim[1], ns.Tokens.gold_rim[2], ns.Tokens.gold_rim[3]
+    t:SetVertexColor(r, g, b, alpha or 0.5)
+    t:SetHeight(1)
+    return t
+end
+
 -- ----------------------------------------------------------
 -- Static popups
 -- ----------------------------------------------------------
