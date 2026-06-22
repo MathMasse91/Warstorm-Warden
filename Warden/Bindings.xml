@@ -1,0 +1,105 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/">
+    <Bindings>
+        <!-- Main window + tab shortcuts -->
+        <Binding name="WARDEN_TOGGLE" header="WARDEN">
+            if WARDEN_Toggle then WARDEN_Toggle() end
+        </Binding>
+        <Binding name="WARDEN_TAB_SPEC">
+            if WARDEN_ShowTab then WARDEN_ShowTab("Spec") end
+        </Binding>
+        <Binding name="WARDEN_TAB_CONTROLS">
+            if WARDEN_ShowTab then WARDEN_ShowTab("Controls") end
+        </Binding>
+        <Binding name="WARDEN_TAB_COMP">
+            if WARDEN_ShowTab then WARDEN_ShowTab("Comp") end
+        </Binding>
+        <Binding name="WARDEN_TAB_ROSTER">
+            if WARDEN_ShowTab then WARDEN_ShowTab("Roster") end
+        </Binding>
+
+        <!-- Quick bot commands - route through WARDENSWORD_Run so they inherit
+             the throttled Engine.Queue path, player-flag skip semantics, and
+             DB.commandChannel override. Raw SendChatMessage bindings used to
+             bypass all of that and could trigger chat-flood disconnects. -->
+        <Binding name="WARDEN_SUMMON">
+            if WARDENSWORD_Run then WARDENSWORD_Run("summon") end
+        </Binding>
+        <Binding name="WARDEN_FOLLOW">
+            if WARDENSWORD_Run then WARDENSWORD_Run("follow") end
+        </Binding>
+        <Binding name="WARDEN_STAY">
+            if WARDENSWORD_Run then WARDENSWORD_Run("stay") end
+        </Binding>
+        <Binding name="WARDEN_TANK_ATTACK">
+            if WARDENSWORD_Run then WARDENSWORD_Run("@tank attack") end
+        </Binding>
+        <Binding name="WARDEN_FLEE">
+            if WARDENSWORD_Run then WARDENSWORD_Run("flee") end
+        </Binding>
+
+        <!-- Real-Time Strategy Control shortcuts (no HUD action equivalent,
+             so they call Engine.Enqueue directly to still respect throttle). -->
+        <Binding name="WARDEN_RTSC_ON">
+            if ns and ns.Engine and ns.Engine.Enqueue then ns.Engine.Enqueue("rtsc") end
+        </Binding>
+        <Binding name="WARDEN_RTSC_SAVE">
+            if ns and ns.Engine and ns.Engine.Enqueue then ns.Engine.Enqueue("rtsc save 1") end
+        </Binding>
+        <Binding name="WARDEN_RTSC_GO">
+            if ns and ns.Engine and ns.Engine.Enqueue then ns.Engine.Enqueue("rtsc go 1") end
+        </Binding>
+
+        <!-- ================================================== -->
+        <!-- WardenSword (mid-fight HUD) bindings -->
+        <!-- ================================================== -->
+        <Binding name="WARDENSWORD_TOGGLE" header="WARDENSWORDACTIONS">
+            if WARDENSWORD_Toggle then WARDENSWORD_Toggle() end
+        </Binding>
+        <Binding name="WARDENSWORD_LOCK">
+            if WARDENSWORD_ToggleLock then WARDENSWORD_ToggleLock() end
+        </Binding>
+        <Binding name="WARDENSWORD_SUMMON">
+            if WARDENSWORD_Run then WARDENSWORD_Run("summon") end
+        </Binding>
+        <Binding name="WARDENSWORD_FOLLOW">
+            if WARDENSWORD_Run then WARDENSWORD_Run("follow") end
+        </Binding>
+        <Binding name="WARDENSWORD_STAY">
+            if WARDENSWORD_Run then WARDENSWORD_Run("stay") end
+        </Binding>
+        <Binding name="WARDENSWORD_FLEE">
+            if WARDENSWORD_Run then WARDENSWORD_Run("flee") end
+        </Binding>
+        <Binding name="WARDENSWORD_AOE">
+            if WARDENSWORD_Run then WARDENSWORD_Run("aoe") end
+        </Binding>
+        <Binding name="WARDENSWORD_BURN">
+            if WARDENSWORD_Run then WARDENSWORD_Run("burn") end
+        </Binding>
+        <Binding name="WARDENSWORD_SKULL">
+            if WARDENSWORD_Run then WARDENSWORD_Run("skull") end
+        </Binding>
+        <Binding name="WARDENSWORD_BL">
+            if WARDENSWORD_Run then WARDENSWORD_Run("bl") end
+        </Binding>
+
+        <Binding name="WARDENSWORD_TANK_ATK" header="WARDENSWORDROLES">
+            if WARDENSWORD_Run then WARDENSWORD_Run("@tank attack") end
+        </Binding>
+        <Binding name="WARDENSWORD_TANK_STAY">
+            if WARDENSWORD_Run then WARDENSWORD_Run("@tank stay") end
+        </Binding>
+        <Binding name="WARDENSWORD_HEAL_ATK">
+            if WARDENSWORD_Run then WARDENSWORD_Run("@heal attack") end
+        </Binding>
+        <Binding name="WARDENSWORD_HEAL_STAY">
+            if WARDENSWORD_Run then WARDENSWORD_Run("@heal stay") end
+        </Binding>
+        <Binding name="WARDENSWORD_DPS_ATK">
+            if WARDENSWORD_Run then WARDENSWORD_Run("@dps attack") end
+        </Binding>
+        <Binding name="WARDENSWORD_DPS_STAY">
+            if WARDENSWORD_Run then WARDENSWORD_Run("@dps stay") end
+        </Binding>
+    </Bindings>
+</Ui>
