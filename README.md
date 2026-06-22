@@ -3,6 +3,8 @@
 **All-in-one raid commander for WoW 3.3.5a (WotLK) / WarStorm playerbots.**
 Specs, bots, comp, roster & raid controls — all in one tabbed window, plus combat HUDs and a throttled whisper queue.
 
+> ⚠️ **WarStorm only.** Warden is built exclusively for the **WarStorm** server (WoW 3.3.5a / WotLK, with `mod-playerbots` enabled). It relies on WarStorm's playerbot commands and **will not work** on retail, Classic, or any other private server.
+
 <!-- BANNER: drop a wide screenshot/logo here once available
 ![Warden](docs/images/banner.png)
 -->
