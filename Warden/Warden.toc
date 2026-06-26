@@ -2,7 +2,7 @@
 ## Title: Warden
 ## Notes: Master command center for Warstorm 3.3.5a - specs, bots, comp, roster & raid controls in one tabbed window.
 ## Author: UnrealTruth
-## Version: 1.1.0
+## Version: 1.0.1
 ## SavedVariables: WardenDB, WardenLog, WardenLogEnabled, WardenDebug
 ## OptionalDeps: Blizzard_BindingUI
 ## X-Credits: Forked from WSSM (Patchs & Valleriaa) + merges WarstormBotManager (Moroes), WBMLite and OptimalRaidComposer (both by Runshouse)

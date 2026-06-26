@@ -48,6 +48,11 @@ ns.Engine.state = {
 -- perceptibly slower.
 local WHISPER_INTERVAL = 0.45
 local BUILD_TIMEOUT    = 30     -- seconds after lastAddSent before specQueue is cleared
+-- Wait-for-join pacing: after an addclass we hold the next invite until the
+-- group actually grows by one (the bot joined). If it hasn't joined within
+-- PER_INVITE_TIMEOUT we assume the invite was dropped (server lag), warn, and
+-- move on so one missing bot can't stall the whole build.
+local PER_INVITE_TIMEOUT = 8
 
 -- ----------------------------------------------------------
 -- Public API - send queue
@@ -70,6 +75,14 @@ end
 -- ----------------------------------------------------------
 ns.Engine.ticker = CreateFrame("Frame", "WardenEngineTicker")
 
+-- Current group size counting the player: raid size, or party members + 1,
+-- or 1 when solo. Mirrors how a bot joining bumps the count by one.
+local function groupSize()
+    if GetNumRaidMembers and GetNumRaidMembers() > 0 then return GetNumRaidMembers() end
+    if GetNumPartyMembers and GetNumPartyMembers() > 0 then return GetNumPartyMembers() + 1 end
+    return 1
+end
+
 local function sendTick(self, elapsed)
     local s = ns.Engine.state
     if not s.sending or #s.sendQueue == 0 then
@@ -82,6 +95,32 @@ local function sendTick(self, elapsed)
     local interval = (db and tonumber(db.interval)) or 0.70
     if interval < 0.10 then interval = 0.10 end
 
+    local now  = GetTime()
+    local size = groupSize()
+
+    -- Wait-for-join gate - ONLY during an active build, where each queued
+    -- command is an addclass that grows the group. (Other queue users, e.g.
+    -- InitBots' per-bot init commands, don't add members, so the gate must not
+    -- apply to them - they drain on the plain interval below.)
+    -- s.expectedSize is the size we should reach once the previously-sent bot
+    -- joins; nil means nothing outstanding. Hold until the group catches up
+    -- (anti-lag), or until the per-invite timeout fires and we give up on it.
+    if s.buildActive and s.expectedSize and size < s.expectedSize then
+        if (now - (s.lastAddSentAt or now)) > PER_INVITE_TIMEOUT then
+            DEFAULT_CHAT_FRAME:AddMessage(
+                "|cffff6060[Warden]|r A bot missed its invite (server lag?) - continuing.")
+            if ns.LogF then
+                ns.LogF("paced summon: invite timeout (size=%d expected=%d) - skipping wait",
+                    size, s.expectedSize)
+            end
+            s.expectedSize = nil  -- stop waiting; fall through and send the next
+        else
+            return                -- still waiting for the previous bot to arrive
+        end
+    end
+
+    -- Throttle: even when free to send, never fire faster than the configured
+    -- min interval so back-to-back fast joins don't trip server anti-spam.
     s.elapsed = s.elapsed + elapsed
     if s.elapsed < interval then return end
     s.elapsed = 0
@@ -90,6 +129,8 @@ local function sendTick(self, elapsed)
     SendChatMessage(msg, (db and db.commandChannel) or "SAY")
     s.lastAddSentAt    = GetTime()
     s.counters.spawned = s.counters.spawned + 1
+    -- Arm the join gate for the next send only while building (see above).
+    s.expectedSize = s.buildActive and (size + 1) or nil
 end
 
 function ns.Engine.ArmSendTicker()
@@ -207,6 +248,8 @@ function ns.Engine.StartBuild(plan)
     wipe(s.specdGUIDs)
     wipe(s.whisperQueue)
     s.whisperElapsed   = 0
+    s.elapsed          = 0
+    s.expectedSize     = nil   -- paced-summon gate: nothing outstanding yet
 
     s.rosterBefore = snapshotRoster()
 
@@ -498,8 +541,13 @@ function ns.Engine.Stop()
     wipe(s.sendQueue)
     wipe(s.whisperQueue)
     wipe(s.specQueue)
-    s.sending     = false
-    s.buildActive = false
+    s.sending         = false
+    s.buildActive     = false
+    s.expectedSize    = nil
+    -- Abort any pending one-click "Create" chain: drop the completion hook so
+    -- autogear / world buffs don't still fire, and cancel queued timers.
+    s.onBuildComplete = nil
+    if ns.Engine.CancelTimers then ns.Engine.CancelTimers() end
     if ns.Log then ns.Log("Engine.Stop: all queues wiped") end
     DEFAULT_CHAT_FRAME:AddMessage(
         "|cffffaa00[Warden]|r Build stopped.")
@@ -697,6 +745,25 @@ local function completerTick(self, elapsed)
     if s.completerAccum < 1.0 then return end
     s.completerAccum = 0
 
+    -- Timed ConvertToRaid fallback. The roster watcher converts party->raid on
+    -- roster events, but if those don't fire (or a conversion silently failed
+    -- inside a transient combat lockdown) a 10/25-man build could get stuck in
+    -- party mode. The completer already ticks at a 1s cadence during a build,
+    -- so retry conversion here - this is the timed fallback the event-driven
+    -- path was missing.
+    do
+        local db = ns.Persistence.DB
+        if db and db.autoRaidDuringBuild ~= false
+           and not s.buildFitsInParty
+           and not ns.Engine.IsInRaid()
+           and GetNumPartyMembers() > 0
+           and ns.Engine.IsLeader()
+           and not InCombatLockdown() then
+            ConvertToRaid()
+            if ns.LogF then ns.LogF("completer: timed ConvertToRaid fallback fired") end
+        end
+    end
+
     local pendingSpecs = 0
     for _, queue in pairs(s.specQueue) do
         pendingSpecs = pendingSpecs + #queue
@@ -729,6 +796,18 @@ local function completerTick(self, elapsed)
         end
         -- Clear specQueue after reporting
         wipe(s.specQueue)
+
+        -- Fire-once chain hook, set by ns.Engine.CreateRaid for the one-click
+        -- flow (per-bot init -> autogear -> world buffs). Cleared before the
+        -- call so a callback that itself starts another build can't re-enter.
+        if s.onBuildComplete then
+            local cb = s.onBuildComplete
+            s.onBuildComplete = nil
+            local ok, err = pcall(cb)
+            if not ok and ns.LogError then
+                ns.LogError("onBuildComplete error: " .. tostring(err))
+            end
+        end
     end
 end
 
@@ -745,6 +824,116 @@ function ns.Engine.PendingSpecCount()
         n = n + #queue
     end
     return n
+end
+
+-- ----------------------------------------------------------
+-- Lightweight one-shot timer scheduler (ns.Engine.After).
+-- A single shared frame drains a job list; it hides itself when empty so we
+-- aren't dispatched every frame during normal play. Used to space the steps
+-- of the one-click "Create" sequence. CancelTimers() drops all pending jobs
+-- (called by Engine.Stop so a stopped Create can't fire later steps).
+-- ----------------------------------------------------------
+local _afterFrame = CreateFrame("Frame", "WardenAfterScheduler")
+local _afterJobs  = {}
+_afterFrame:Hide()
+_afterFrame:SetScript("OnUpdate", function(self)
+    if #_afterJobs == 0 then self:Hide(); return end
+    local now = GetTime()
+    for i = #_afterJobs, 1, -1 do
+        if now >= _afterJobs[i].at then
+            local job = table.remove(_afterJobs, i)
+            local ok, err = pcall(job.fn)
+            if not ok and ns.LogError then
+                ns.LogError("After job error: " .. tostring(err))
+            end
+        end
+    end
+end)
+
+function ns.Engine.After(delay, fn)
+    if type(fn) ~= "function" then return end
+    table.insert(_afterJobs, { at = GetTime() + (tonumber(delay) or 0), fn = fn })
+    _afterFrame:Show()
+end
+
+function ns.Engine.CancelTimers()
+    wipe(_afterJobs)
+    _afterFrame:Hide()
+end
+
+-- ----------------------------------------------------------
+-- Public API: InitBots - per-named-bot gear/init.
+-- Sends `.warstormbot bot init=<rarity> <name>` for every bot in the current
+-- group (skips the player and any human-flagged names), throttled through the
+-- send queue so a 25-man init doesn't blast the server in one frame. Unlike
+-- the global `init=<rarity>` (no name), this targets each bot individually -
+-- matching how the bot core applies gear per character. Returns the count.
+-- ----------------------------------------------------------
+function ns.Engine.InitBots(rarity)
+    rarity = (type(rarity) == "string" and rarity ~= "" and rarity) or "epic"
+    local pattern = ".warstormbot bot init=" .. rarity .. " %s"
+    local n = 0
+    local function consider(unit)
+        if not UnitExists(unit) or not UnitIsPlayer(unit) then return end
+        if UnitIsUnit(unit, "player") then return end
+        local name = UnitName(unit)
+        if not name then return end
+        if ns.Persistence and ns.Persistence.IsPlayerName
+           and ns.Persistence.IsPlayerName(name) then return end
+        ns.Engine.Queue(string.format(pattern, name))  -- drains on the command channel
+        n = n + 1
+    end
+    if ns.Engine.IsInRaid() then
+        for i = 1, GetNumRaidMembers() do consider("raid" .. i) end
+    else
+        for i = 1, GetNumPartyMembers() do consider("party" .. i) end
+    end
+    DEFAULT_CHAT_FRAME:AddMessage(string.format(
+        "|cff00ff00[Warden]|r Init: queued init=%s for %d bot(s).", rarity, n))
+    if ns.LogF then ns.LogF("InitBots: queued init=%s for %d bots", rarity, n) end
+    return n
+end
+
+-- ----------------------------------------------------------
+-- Public API: CreateRaid - the one-click "Create" sequence.
+-- remove all bots -> (beat) -> paced StartBuild (which auto-converts to raid,
+-- auto-specs, applies AI strategies) -> on completion: per-bot init -> autogear
+-- -> world buffs. Each finisher is spaced via ns.Engine.After so the server
+-- processes them in order. Note: a full role-based re-sort is NOT part of this
+-- chain yet (that's the separate sort feature); StartBuild still auto-moves the
+-- player to their [P] slot. opts = { initRarity = "epic" | nil }.
+-- ----------------------------------------------------------
+function ns.Engine.CreateRaid(plan, opts)
+    opts = opts or {}
+    local s    = ns.Engine.state
+    local db   = ns.Persistence.DB
+    local chan = (db and db.commandChannel) or "SAY"
+
+    -- Clear any half-finished prior run so hooks/timers don't overlap.
+    ns.Engine.CancelTimers()
+    s.onBuildComplete = nil
+
+    DEFAULT_CHAT_FRAME:AddMessage(
+        "|cff00ff00[Warden]|r Create: removing existing bots...")
+    SendChatMessage(".warstormbot bot remove *", chan)
+
+    -- Chain the gear/buff finishers onto build completion.
+    s.onBuildComplete = function()
+        local rarity = opts.initRarity
+        if rarity then ns.Engine.InitBots(rarity) end
+        -- autogear then world buffs, spaced (and after init has a head start).
+        ns.Engine.After(rarity and 2.0 or 0.5, function()
+            if ns.Broadcast then ns.Broadcast("autogear") end
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Warden]|r Create: sent autogear.")
+        end)
+        ns.Engine.After(rarity and 4.0 or 2.5, function()
+            if ns.Broadcast then ns.Broadcast("nc +worldbuff") end
+            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Warden]|r Create: world buffs sent. Done.")
+        end)
+    end
+
+    -- Give the remove-all a beat to process, then kick off the paced build.
+    ns.Engine.After(1.5, function() ns.Engine.StartBuild(plan) end)
 end
 
 -- ==========================================================

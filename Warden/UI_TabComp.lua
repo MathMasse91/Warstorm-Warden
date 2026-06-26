@@ -960,6 +960,23 @@ StaticPopupDialogs["WARDEN_COMP_DELETE"] = {
     timeout = 0, whileDead = true, hideOnEscape = true,
 }
 
+-- Rename a saved comp. `data` carries the OLD name (also fills the %s in the
+-- prompt); the new name comes from the edit box; onConfirm is injected at
+-- click-time so the popup needs no upvalues into the BuildInto closure.
+StaticPopupDialogs["WARDEN_COMP_RENAME"] = {
+    text                   = "Rename comp '%s' to:",
+    button1                = ACCEPT, button2 = CANCEL,
+    hasEditBox             = true, editBoxWidth = 220,
+    OnShow                 = function(self) if self.editBox then self.editBox:SetFocus() end end,
+    OnAccept               = function(self)
+        local newName = self.editBox and self.editBox:GetText() or ""
+        if self.onConfirm then self.onConfirm(self.data, newName) end
+    end,
+    EditBoxOnEnterPressed  = function(self) self:GetParent().button1:Click() end,
+    EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
+    timeout = 0, whileDead = true, hideOnEscape = true,
+}
+
 loadFromRows = function(rows, size)
     wipe(state.slots)
     if type(rows) ~= "table" then return end
@@ -1645,11 +1662,10 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     buildShadow:SetPoint("BOTTOMRIGHT", buildBtn, "BOTTOMRIGHT", -1,   1)
     buildShadow:SetDrawLayer("OVERLAY", -1)
 
-    buildBtn:SetScript("OnClick", function()
-        local plan = readPlan()
-        if ns.DebugF then ns.DebugF("comp", "Build clicked: plan rows=%d", #plan) end
-        if #plan == 0 then ns.MsgErr("Grid is empty - nothing to build."); return end
-
+    -- runBuild: the actual build kickoff, factored out of the click handler
+    -- so both the direct path and the safe-summon confirmation popup can run
+    -- the exact same logic.
+    local function runBuild(plan)
         -- BUG-#4: if the user placed the [P] (isPlayer) slot in e.g.
         -- group 3 (caster group) but the player is currently in group 1,
         -- bots spawn into G1 first and push the caster group off by one.
@@ -1666,6 +1682,31 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
         end
 
         ns.Engine.StartBuild(plan)
+    end
+
+    -- Safe-summon guard: clicking Build while already in a group/raid kicks
+    -- off the add/remove churn of StartBuild over your live roster, which can
+    -- wipe a raid on a stray click. Confirm first - mirrors the prompt the
+    -- competing addon shows on its "Create" button. (data carries the plan;
+    -- OnAccept receives it as the 2nd arg, same pattern WoW uses elsewhere.)
+    StaticPopupDialogs["WARDEN_CONFIRM_BUILD"] = {
+        text         = "You're already in a group/raid.\nBuild will re-summon bots over the current roster. Proceed?",
+        button1      = YES, button2 = NO, timeout = 0,
+        whileDead    = true, hideOnEscape = true,
+        OnAccept     = function(_, data) runBuild(data) end,
+    }
+
+    buildBtn:SetScript("OnClick", function()
+        local plan = readPlan()
+        if ns.DebugF then ns.DebugF("comp", "Build clicked: plan rows=%d", #plan) end
+        if #plan == 0 then ns.MsgErr("Grid is empty - nothing to build."); return end
+
+        if (GetNumRaidMembers() > 0) or (GetNumPartyMembers() > 0) then
+            StaticPopup_Show("WARDEN_CONFIRM_BUILD", nil, nil, plan)
+            return
+        end
+
+        runBuild(plan)
     end)
 
     state.sidebar.summary = { numLbl = numLbl, buildBtn = buildBtn }
@@ -1726,6 +1767,11 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     -- Hidden in v1.0.0 - feature kept in code, just not exposed in the UI.
     -- Re-show by deleting the next line.
     resyncBtn:Hide()
+
+    -- Rename a saved comp. Occupies row 2's 4th cell (same anchor as the
+    -- hidden resync button) so no layout math changes.
+    local renameBtn = ns.UI.Button.stone(fileHost, "rename", FILE_BTN_W, FILE_BTN_H)
+    renameBtn:SetPoint("LEFT", cleanBtn, "RIGHT", FILE_BTN_GAP, 0)
 
     -- Resync: rearrange the LIVE raid so each member's subgroup matches
     -- the comp grid's slot positions. FIFO-matches each filled slot to
@@ -1926,6 +1972,47 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
         end
     end)
 
+    renameBtn:SetScript("OnClick", function()
+        local name = Trim(state.nameBox:GetText())
+        local db   = ns.Persistence.DB
+        if not db then return end
+        if name == "" then name = db.lastComp or "" end
+        if name == "" then
+            ns.MsgErr("Enter or select a comp to rename.")
+            return
+        end
+        if type(db.comps[name]) ~= "table" then
+            ns.MsgWarn(string.format("No saved comp named '%s'.", name))
+            return
+        end
+        local popup = StaticPopup_Show("WARDEN_COMP_RENAME", name)
+        if popup then
+            popup.data = name
+            popup.onConfirm = function(oldName, newName)
+                newName = Trim(newName or "")
+                if newName == "" then
+                    ns.MsgErr("Rename cancelled: empty name.")
+                    return
+                end
+                if newName == oldName then return end
+                if type(db.comps[newName]) == "table" then
+                    ns.MsgWarn(string.format("A comp named '%s' already exists.", newName))
+                    return
+                end
+                db.comps[newName] = db.comps[oldName]
+                db.comps[oldName] = nil
+                if db.lastComp == oldName then db.lastComp = newName end
+                if state.nameBox then state.nameBox:SetText(newName) end
+                refreshPresetDropdown()
+                ns.MsgInfo(string.format("Renamed comp '%s' -> '%s'.", oldName, newName))
+            end
+            if popup.editBox then
+                popup.editBox:SetText(name)
+                popup.editBox:HighlightText()
+            end
+        end
+    end)
+
     importBtn:SetScript("OnClick", function() StaticPopup_Show("WARDEN_COMP_IMPORT") end)
     exportBtn:SetScript("OnClick", function()
         local s = exportCompString()
@@ -1964,6 +2051,42 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
                 ns.Engine.QueueDepth(),
                 ns.Engine.PendingSpecCount and ns.Engine.PendingSpecCount() or 0))
         end
+    end)
+
+    -- Stop button: aborts an in-progress Build by wiping the summon / spec /
+    -- whisper queues (ns.Engine.Stop). Until now the only way to halt a
+    -- runaway build was /reload - Engine.Stop() existed but was wired to no
+    -- control (the old action strip that held it was removed, see above).
+    local stopBtn = ns.UI.Button.warn(pane, "Stop Build", 96, 22)
+    stopBtn:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -12, 4)
+    stopBtn:SetScript("OnClick", function()
+        if ns.Engine and ns.Engine.Stop then
+            ns.Engine.Stop()
+        end
+    end)
+
+    -- Create: one-click ORC-style sequence - remove ALL current bots, paced
+    -- re-summon of this comp (auto-converts to raid + auto-specs + AI strats),
+    -- then per-bot init=epic, autogear, and world buffs. Destructive, so it's
+    -- always behind a confirm. NOTE: a full role-based raid re-sort is not part
+    -- of this chain yet (that's the separate sort feature); the build still
+    -- auto-moves the player to their [P] slot.
+    local createBtn = ns.UI.Button.red(pane, "Create", 72, 22)
+    createBtn:SetPoint("RIGHT", stopBtn, "LEFT", -6, 0)
+    StaticPopupDialogs["WARDEN_CONFIRM_CREATE"] = {
+        text         = "Create raid:\nremoves ALL current bots, re-summons this comp, gears them (init=epic + autogear) and applies world buffs. Proceed?",
+        button1      = YES, button2 = NO, timeout = 0,
+        whileDead    = true, hideOnEscape = true,
+        OnAccept     = function(_, data)
+            if ns.Engine and ns.Engine.CreateRaid then
+                ns.Engine.CreateRaid(data, { initRarity = "epic" })
+            end
+        end,
+    }
+    createBtn:SetScript("OnClick", function()
+        local plan = readPlan()
+        if #plan == 0 then ns.MsgErr("Grid is empty - nothing to create."); return end
+        StaticPopup_Show("WARDEN_CONFIRM_CREATE", nil, nil, plan)
     end)
 
     -- Final wiring

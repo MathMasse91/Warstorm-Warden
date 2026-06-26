@@ -1,0 +1,1400 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Warden Shield & Pocket — Design Doc</title>
+<style>
+:root {
+  /* Warden token palette (extracted from Core.lua ns.Tokens) */
+  --stone-dark: #0e0b08;
+  --stone-mid:  #1a140d;
+  --stone-tile: #2a2016;
+  --stone-rim:  #3a2f22;
+  --gold:       #ffd100;
+  --gold-dim:   #b89536;
+  --gold-rim:   #a88a4c;
+  --red-btn:    #7a1a15;
+  --red-hi:     #b92b22;
+  --ink-red:    #e04a3a;
+  --green:      #2ecc40;
+  --amber:      #ff9a00;
+  --text-warm:  #ffebbf;
+  /* Doc surface */
+  --paper:      #f4efe5;
+  --paper-2:    #ebe4d4;
+  --ink:        #1f1a12;
+  --ink-soft:   #5e554a;
+  --rule:       #c8bfa9;
+  /* Class colors (a subset used in the mockups) */
+  --c-mage:     #69ccf0;
+  --c-priest:   #ffffff;
+  --c-shaman:   #0070de;
+  --c-rogue:    #fff569;
+}
+
+html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); }
+body {
+  font: 15px/1.55 "Charter", "Iowan Old Style", "Source Serif Pro", Georgia, serif;
+  font-feature-settings: "kern", "liga", "onum";
+  text-rendering: geometricPrecision;
+}
+main { max-width: 940px; margin: 0 auto; padding: 64px 48px 120px; }
+
+/* Document chrome */
+.eyebrow {
+  font: 600 11px/1 "Helvetica Neue", system-ui, sans-serif;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--ink-soft);
+}
+h1 {
+  font: 600 44px/1.05 "Charter", Georgia, serif;
+  letter-spacing: -0.012em;
+  margin: 12px 0 8px;
+}
+h1 small {
+  display: block; font: 400 18px/1.4 "Charter", Georgia, serif;
+  color: var(--ink-soft); margin-top: 8px;
+  font-style: italic;
+}
+h2 {
+  font: 600 26px/1.2 "Charter", Georgia, serif;
+  letter-spacing: -0.01em;
+  margin: 64px 0 4px;
+  border-top: 1px solid var(--rule);
+  padding-top: 32px;
+}
+h2 .num {
+  display: inline-block; width: 1.6em;
+  color: var(--ink-soft); font-variant-numeric: lining-nums;
+}
+h3 {
+  font: 600 17px/1.35 "Helvetica Neue", system-ui, sans-serif;
+  letter-spacing: -0.005em;
+  margin: 28px 0 6px;
+  color: var(--ink);
+}
+h4 {
+  font: 600 12px/1 "Helvetica Neue", system-ui, sans-serif;
+  letter-spacing: 0.10em; text-transform: uppercase;
+  color: var(--ink-soft);
+  margin: 18px 0 6px;
+}
+p { margin: 0 0 14px; max-width: 64ch; text-wrap: pretty; }
+ul, ol { padding-left: 22px; max-width: 64ch; }
+ul li, ol li { margin-bottom: 6px; }
+strong { font-weight: 600; }
+code, .mono {
+  font: 13px/1.5 "JetBrains Mono", "Menlo", "Consolas", monospace;
+  background: var(--paper-2); padding: 1px 5px; border-radius: 3px;
+}
+pre {
+  background: var(--paper-2); color: var(--ink);
+  padding: 14px 16px; border-radius: 4px;
+  font: 12.5px/1.55 "JetBrains Mono", "Menlo", monospace;
+  overflow-x: auto; max-width: 100%;
+  border-left: 3px solid var(--gold-rim);
+}
+.lede {
+  font-size: 17px; line-height: 1.55;
+  color: var(--ink); max-width: 60ch;
+  border-left: 3px solid var(--gold-rim);
+  padding: 0 0 0 18px;
+  margin: 32px 0 40px;
+}
+.toc {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4px 32px;
+  font: 13px/1.7 "Helvetica Neue", system-ui, sans-serif;
+  margin: 24px 0 12px;
+  padding: 18px 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.toc a { color: var(--ink); text-decoration: none; display: flex; gap: 12px; }
+.toc a .num { color: var(--ink-soft); width: 1.8em; font-variant-numeric: tabular-nums; }
+.toc a:hover { color: var(--red-hi); }
+
+/* Mockup stage — renders Warden HUDs at native pixel scale */
+.stage {
+  background: #15110b;
+  background-image:
+    radial-gradient(ellipse at 30% 20%, rgba(255,209,0,0.04), transparent 60%),
+    linear-gradient(180deg, #1a140d, #0a0805);
+  padding: 36px 28px;
+  margin: 22px 0;
+  border-radius: 4px;
+  display: flex; flex-direction: column; align-items: center;
+  position: relative;
+  gap: 16px;
+}
+.stage.row { flex-direction: row; align-items: flex-start; justify-content: center; gap: 36px; flex-wrap: wrap; }
+.stage-tag {
+  position: absolute; top: 10px; left: 14px;
+  font: 600 10px/1 "Helvetica Neue", system-ui, sans-serif;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--gold-rim);
+}
+.stage-caption {
+  font: 400 13px/1.5 "Charter", Georgia, serif;
+  font-style: italic; color: var(--ink-soft);
+  margin: -8px 0 32px; max-width: 60ch;
+}
+
+/* === Warden HUD primitives === */
+.hud {
+  background: var(--stone-dark);
+  /* faux tiled stone bg */
+  background-image:
+    repeating-linear-gradient(0deg, rgba(40,28,12,0.18) 0 1px, transparent 1px 2px),
+    repeating-linear-gradient(90deg, rgba(40,28,12,0.14) 0 1px, transparent 1px 3px);
+  border: 1px solid var(--gold-rim);
+  font: 11px/1.2 "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+  color: var(--text-warm);
+  position: relative;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.55), 0 2px 0 rgba(0,0,0,0.3);
+}
+.hud .head {
+  height: 22px;
+  display: flex; align-items: center; padding: 0 8px;
+  border-bottom: 1px solid var(--stone-rim);
+  gap: 8px;
+}
+.hud .head .title {
+  color: var(--gold); font-weight: 700;
+  font: 700 11px/1 "Helvetica Neue", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+}
+.hud .head .hint { color: var(--gold-dim); font-size: 10px; }
+.hud .head .right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.hud .glyph {
+  width: 16px; height: 16px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font: 700 12px/1 "Helvetica Neue", sans-serif;
+  cursor: pointer;
+}
+.hud .glyph.lock { color: var(--gold-dim); }
+.hud .glyph.lock.on { color: var(--gold); }
+.hud .glyph.x { color: var(--ink-red); }
+
+/* Buttons (3 tiers from Core.lua: stone / gold / red) */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--stone-tile);
+  border: 1px solid var(--stone-rim);
+  color: var(--gold-dim);
+  font: 600 10.5px/1 "Helvetica Neue", system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  height: 22px; padding: 0 10px;
+  cursor: pointer; user-select: none;
+}
+.btn.tall { height: 22px; }
+.btn.short { height: 18px; padding: 0 8px; font-size: 10px; }
+.btn.gold { border-color: var(--gold-rim); color: var(--gold); }
+.btn.red {
+  background: var(--red-btn); border-color: var(--red-btn);
+  color: var(--text-warm);
+}
+.btn.armed {
+  border-color: var(--gold-rim); color: var(--gold);
+  box-shadow: 0 0 0 1px rgba(168,138,76,0.4) inset;
+}
+.btn:hover { filter: brightness(1.18); }
+.btn[disabled] { opacity: 0.45; cursor: default; }
+
+/* Segmented control (NEW for mode row) */
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--stone-rim);
+  background: var(--stone-mid);
+  height: 22px;
+}
+.seg .opt {
+  padding: 0 10px;
+  display: inline-flex; align-items: center;
+  font: 600 10.5px/1 "Helvetica Neue", sans-serif;
+  color: var(--gold-dim);
+  cursor: pointer;
+  border-right: 1px solid var(--stone-rim);
+}
+.seg .opt:last-child { border-right: 0; }
+.seg .opt.on { color: var(--gold); background: var(--stone-tile); box-shadow: inset 0 0 0 1px var(--gold-rim); }
+.seg .opt:hover { color: var(--text-warm); }
+
+/* Rows */
+.row { display: flex; align-items: center; gap: 6px; padding: 0 8px; height: 22px; }
+.row.tight { gap: 4px; }
+.rule { height: 1px; background: var(--stone-rim); margin: 0 8px; }
+
+/* Class color helpers */
+.c-mage { color: var(--c-mage); }
+.c-priest { color: var(--c-priest); }
+.c-shaman { color: var(--c-shaman); }
+.c-rogue { color: var(--c-rogue); }
+.dim { color: var(--gold-dim); }
+.warm { color: var(--text-warm); }
+.muted { color: #6e6552; }
+.gold { color: var(--gold); }
+.amber { color: var(--amber); }
+.red { color: var(--ink-red); }
+.green { color: var(--green); }
+
+/* Status strip */
+.status {
+  font: 600 10px/1 "Helvetica Neue", sans-serif;
+  letter-spacing: 0.02em;
+  padding: 4px 10px; color: var(--gold-dim);
+  border-top: 1px solid var(--stone-rim);
+  display: flex; align-items: center; gap: 8px;
+}
+.status .pulse {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--gold); box-shadow: 0 0 6px var(--gold);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+.status.armed { color: var(--gold); }
+
+/* Capture list */
+.list {
+  background: var(--stone-dark);
+  border-top: 1px solid var(--stone-rim);
+  padding: 4px 8px 4px;
+  font: 11px/1 "Helvetica Neue", sans-serif;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.list .section-hdr {
+  font: 600 9.5px/1 "Helvetica Neue", sans-serif;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--gold-rim);
+  padding: 6px 4px 2px;
+  display: flex; align-items: center; gap: 6px;
+}
+.list .section-hdr .ln {
+  flex: 1; height: 1px; background: var(--stone-rim);
+}
+.list .item {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(20,14,8,0.5);
+  border: 1px solid var(--stone-rim);
+  padding: 0 6px;
+  height: 18px;
+  color: var(--text-warm);
+  font-size: 11px;
+}
+.list .item:hover { border-color: var(--gold-rim); cursor: pointer; }
+.list .item .name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list .item .tag {
+  font: 600 9px/1 "Helvetica Neue", sans-serif;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 2px 4px; border-radius: 2px;
+}
+.list .item .tag.usable { color: var(--amber); }
+.list .item .tag.gray { color: #707070; }
+.list .item .tag.bot { color: var(--gold-dim); }
+.list .item.banned .name { color: #6a4a45; text-decoration: line-through; }
+.list .item.banned .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-red); }
+.list .item.excl .name { color: var(--ink-red); }
+
+/* Footer */
+.foot {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--stone-rim);
+  background: var(--stone-mid);
+}
+.foot .grow { flex: 1; }
+
+/* Pocket-specific */
+.pocket-item-slot {
+  width: 28px; height: 28px;
+  background: #000; border: 1px solid var(--stone-rim);
+  display: inline-flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.pocket-item-slot.empty { color: var(--gold-rim); font-size: 18px; opacity: 0.5; }
+.pocket-item-slot.filled {
+  background: radial-gradient(circle at 35% 30%, #4a2818, #2a1408);
+  color: var(--gold);
+}
+.pocket-item-slot .ic {
+  width: 22px; height: 22px;
+  background:
+    linear-gradient(135deg, #d4a040 0%, #8a5a18 100%);
+  border-radius: 2px;
+}
+.editbox {
+  background: #060403;
+  border: 1px solid var(--stone-rim);
+  color: var(--text-warm);
+  height: 20px;
+  padding: 0 6px;
+  font: 11px/1 "Helvetica Neue", sans-serif;
+  display: inline-flex; align-items: center;
+}
+.editbox.num { width: 30px; justify-content: center; }
+.editbox.linkbox { flex: 1; }
+.editbox.linkbox .link { color: var(--c-rogue); }
+
+.pocket-offer {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 8px;
+  height: 20px;
+  font: 11px/1 "Helvetica Neue", sans-serif;
+}
+.pocket-offer.top {
+  height: 28px;
+  background: linear-gradient(90deg, rgba(255,209,0,0.10), rgba(255,209,0,0.02));
+  border-left: 2px solid var(--gold);
+  margin-left: -1px;
+}
+.pocket-offer.top .name { font-size: 13px; font-weight: 700; color: var(--gold); }
+.pocket-offer.top .price { font-size: 13px; color: var(--gold); font-weight: 700; }
+.pocket-offer.second { height: 22px; }
+.pocket-offer.second .name { color: var(--text-warm); }
+.pocket-offer.second .price { color: var(--text-warm); }
+.pocket-offer .name { flex: 1; }
+.pocket-offer .crown { color: var(--gold); font-size: 11px; width: 10px; }
+.pocket-offer.zebra:nth-child(odd) { background: rgba(255,255,255,0.02); }
+
+.armed-banner {
+  background: linear-gradient(180deg, rgba(255,154,0,0.22), rgba(255,154,0,0.06));
+  border-bottom: 1px solid rgba(255,154,0,0.4);
+  color: var(--amber);
+  padding: 4px 10px;
+  font: 600 10.5px/1 "Helvetica Neue", sans-serif;
+  letter-spacing: 0.02em;
+  display: flex; align-items: center; gap: 8px;
+}
+.armed-banner .blip {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--amber);
+  box-shadow: 0 0 6px var(--amber); animation: pulse 1.2s ease-in-out infinite;
+}
+
+/* Side-by-side compare */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 18px 0; }
+.compare .col { display: flex; flex-direction: column; align-items: center; }
+.compare h4 { margin-top: 0; align-self: flex-start; padding-left: 4px; }
+
+/* Token swatches */
+.swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0 4px; }
+.swatch {
+  background: var(--paper-2);
+  padding: 10px 12px;
+  border-radius: 3px;
+  font: 11px/1.4 "JetBrains Mono", monospace;
+  display: flex; align-items: center; gap: 10px;
+}
+.swatch .chip {
+  width: 22px; height: 22px;
+  border: 1px solid rgba(0,0,0,0.25);
+}
+.swatch .info { display: flex; flex-direction: column; }
+.swatch .info .nm { color: var(--ink); font-weight: 600; }
+.swatch .info .hx { color: var(--ink-soft); font-size: 10px; }
+
+/* Two-column key/value table */
+.kv {
+  width: 100%;
+  border-collapse: collapse;
+  font: 13px/1.5 "Helvetica Neue", system-ui, sans-serif;
+  margin: 12px 0 16px;
+  max-width: 60ch;
+}
+.kv th, .kv td {
+  text-align: left; padding: 7px 12px 7px 0;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+.kv th {
+  font-weight: 600; color: var(--ink-soft);
+  width: 22%;
+  text-transform: uppercase; font-size: 11px; letter-spacing: 0.08em;
+}
+.kv .mono { background: transparent; padding: 0; }
+
+/* Question/answer block */
+.qa {
+  display: grid; grid-template-columns: 32px 1fr;
+  gap: 4px 18px;
+  margin: 18px 0;
+  max-width: 64ch;
+}
+.qa .q-num {
+  font: 600 13px/1.4 "Charter", Georgia, serif;
+  color: var(--gold-rim); padding-top: 2px;
+  font-variant-numeric: lining-nums;
+}
+.qa .q {
+  font: 600 14px/1.4 "Helvetica Neue", system-ui, sans-serif;
+  color: var(--ink);
+}
+.qa .a {
+  grid-column: 2;
+  font: 14px/1.55 "Charter", Georgia, serif;
+  color: var(--ink);
+  margin-top: 4px;
+}
+.qa .a .verdict {
+  display: inline-block;
+  font: 600 10px/1 "Helvetica Neue", sans-serif;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 3px 6px; margin-right: 8px;
+  background: var(--stone-tile); color: var(--gold);
+  border-radius: 2px;
+}
+.qa .a .verdict.no { color: var(--ink-red); background: #2a1814; }
+.qa .a .verdict.maybe { color: var(--amber); background: #2a1f08; }
+
+/* Annotation callouts on mockups */
+.annotated { position: relative; }
+.note {
+  position: absolute;
+  font: 11px/1.35 "Charter", Georgia, serif;
+  font-style: italic;
+  color: var(--gold-rim);
+  max-width: 200px;
+}
+.note .arrow {
+  display: inline-block; color: var(--gold);
+  margin-right: 4px;
+}
+.label-pill {
+  display: inline-block;
+  background: var(--paper-2);
+  color: var(--ink-soft);
+  font: 600 10px/1.3 "Helvetica Neue", sans-serif;
+  letter-spacing: 0.05em;
+  padding: 3px 7px;
+  border-radius: 10px;
+  text-transform: uppercase;
+}
+.label-pill.new { background: #1b3a1b; color: #6ed16e; }
+.label-pill.change { background: #3a2a14; color: var(--gold); }
+.label-pill.keep { background: #1f1a12; color: var(--ink-soft); }
+
+.figure-cap {
+  font: 400 12px/1.5 "Charter", Georgia, serif;
+  color: var(--gold-rim); font-style: italic;
+  margin-top: 14px; text-align: center;
+}
+
+.foot-sig {
+  border-top: 1px solid var(--rule);
+  margin-top: 80px; padding-top: 18px;
+  font: 12px/1.55 "Charter", Georgia, serif;
+  font-style: italic; color: var(--ink-soft);
+}
+
+/* Hide the toolbar/icons line when needed */
+.icon-circle {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1px solid var(--stone-rim);
+  background: var(--stone-tile);
+  display: inline-block; vertical-align: middle;
+}
+.icon-circle.active { background: var(--gold); border-color: var(--gold-rim); box-shadow: 0 0 4px var(--gold); }
+</style>
+</head>
+<body>
+<main>
+
+<div class="eyebrow">Warden Addon · Design Document</div>
+<h1>Warden Shield &amp; Warden Pocket
+  <small>Redesign aligné sur le langage visuel de Warden / Sword. Mai 2026.</small>
+</h1>
+
+<p class="lede">
+WardenShield et WardenPocket sont les deux modules satellites du raid commander Warden. Ce document
+documente leur langage visuel actuel, identifie les frictions à corriger, et propose une refonte
+qui resserre la hiérarchie sans casser l’identité « stone &amp; gold » que Sword a déjà établie.
+Aucune des décisions ici ne touche au main frame Warden ni à WardenSword.
+</p>
+
+<nav class="toc">
+  <a href="#vocab"><span class="num">1.</span><span>Vocabulaire visuel Warden</span></a>
+  <a href="#shield-overview"><span class="num">2.</span><span>Shield — diagnostic</span></a>
+  <a href="#shield-principles"><span class="num">3.</span><span>Shield — principes de refonte</span></a>
+  <a href="#shield-mockup"><span class="num">4.</span><span>Shield — maquette</span></a>
+  <a href="#shield-qa"><span class="num">5.</span><span>Shield — réponses aux 8 questions ouvertes</span></a>
+  <a href="#shield-spec"><span class="num">6.</span><span>Shield — spec d’implémentation</span></a>
+  <a href="#pocket-overview"><span class="num">7.</span><span>Pocket — diagnostic</span></a>
+  <a href="#pocket-principles"><span class="num">8.</span><span>Pocket — principes de refonte</span></a>
+  <a href="#pocket-mockup"><span class="num">9.</span><span>Pocket — maquette</span></a>
+  <a href="#pocket-spec"><span class="num">10.</span><span>Pocket — spec d’implémentation</span></a>
+  <a href="#migration"><span class="num">11.</span><span>Migration &amp; risques</span></a>
+</nav>
+
+<!-- =================== 1. VOCABULAIRE =================== -->
+<h2 id="vocab"><span class="num">1.</span>Vocabulaire visuel Warden</h2>
+
+<p>Tous les modules de Warden partagent une palette unique (<code>ns.Tokens</code>, <code>Core.lua:132</code>)
+et trois tiers de boutons (<code>ns.UI.Button.{stone,gold,red,warn}</code>). Cette refonte n’invente aucun
+token et n’ajoute aucun nouveau tier de bouton — tout doit pouvoir être implémenté avec les helpers
+existants.</p>
+
+<h4>Palette canonique</h4>
+<div class="swatches">
+  <div class="swatch"><span class="chip" style="background:#0e0b08"></span><div class="info"><span class="nm">stone_dark</span><span class="hx">#0e0b08</span></div></div>
+  <div class="swatch"><span class="chip" style="background:#1a140d"></span><div class="info"><span class="nm">stone_mid</span><span class="hx">#1a140d</span></div></div>
+  <div class="swatch"><span class="chip" style="background:#2a2016"></span><div class="info"><span class="nm">stone_tile</span><span class="hx">#2a2016</span></div></div>
+  <div class="swatch"><span class="chip" style="background:#3a2f22"></span><div class="info"><span class="nm">stone_rim</span><span class="hx">#3a2f22</span></div></div>
+  <div class="swatch"><span class="chip" style="background:#ffd100"></span><div class="info"><span class="nm">gold</span><span class="hx">#ffd100</span></div></div>
+  <div class="swatch"><span class="chip" style="background:#b89536"></span><div class="info"><span class="nm">gold_dim</span><span class="hx">#b89536</span></div></div>
+  <div class="swatch"><span class="chip" style="background:#a88a4c"></span><div class="info"><span class="nm">gold_rim</span><span class="hx">#a88a4c</span></div></div>
+  <div class="swatch"><span class="chip" style="background:#7a1a15"></span><div class="info"><span class="nm">red_btn</span><span class="hx">#7a1a15</span></div></div>
+  <div class="swatch"><span class="chip" style="background:#e04a3a"></span><div class="info"><span class="nm">ink_red</span><span class="hx">#e04a3a</span></div></div>
+  <div class="swatch"><span class="chip" style="background:#ff9a00"></span><div class="info"><span class="nm">amber</span><span class="hx">#ff9a00</span></div></div>
+  <div class="swatch"><span class="chip" style="background:#2ecc40"></span><div class="info"><span class="nm">green</span><span class="hx">#2ecc40</span></div></div>
+  <div class="swatch"><span class="chip" style="background:#ffebbf"></span><div class="info"><span class="nm">text_warm</span><span class="hx">#ffebbf</span></div></div>
+</div>
+
+<h4>Densités et frères</h4>
+<p>Shield et Pocket sont les <em>frères visuels</em> de WardenSword : même header 22 px, même tier de bouton stone par défaut, même tile <code>UI-DialogBox-Background</code>, même bordure 1 px <code>gold_rim</code>. La largeur cible (240-280 px) les place dans la famille « compact HUD ». Le main frame Warden (760×600) reste l’unique frame « presentation ».</p>
+
+<table class="kv">
+  <tr><th>Sword</th><td>240 px · compact · HIGH strata · contrôle de raid mid-fight</td></tr>
+  <tr><th>Shield</th><td>260 px · compact · HIGH strata · discovery de bots</td></tr>
+  <tr><th>Pocket</th><td>280 px · compact · MEDIUM strata · WTS aggregator</td></tr>
+  <tr><th>Main</th><td>760×600 · presentation · HIGH strata · setup &amp; comp</td></tr>
+</table>
+
+<h4>Grammaire d’interaction commune</h4>
+<ul>
+  <li><strong>Header glyphs</strong> : <code>o</code> / <code>*</code> pour lock, <code>x</code> rouge pour close. Aucun chrome Blizzard sauf <code>UIPanelCloseButton</code> (Pocket l’utilise déjà ; Shield et Sword ont leur propre glyphe).</li>
+  <li><strong>Hover</strong> : ADD-blend blanc à 10 % alpha sur le bouton — déjà géré par <code>ns.UI.Button</code>.</li>
+  <li><strong>Active / armed</strong> : la bordure passe de <code>stone_rim</code> à <code>gold_rim</code>. Jamais de remplissage gold sauf pour le bouton <code>BLOODLUST ON</code> de Sword.</li>
+  <li><strong>Pulse</strong> : 120 ms gold rim → stone, sur clic d’une row (cf. <code>row.pulse</code> dans <code>Shield.lua</code>).</li>
+  <li><strong>Status</strong> : texte <code>GameFontDisableSmall</code>, point médian U+00B7 comme séparateur (<code>idle · 0 lines</code>).</li>
+</ul>
+
+<!-- =================== 2. SHIELD DIAGNOSTIC =================== -->
+<h2 id="shield-overview"><span class="num">2.</span>Shield — diagnostic de l’existant</h2>
+
+<p>L’implémentation actuelle (<code>Shield.lua</code>, 1140 lignes) fonctionne et a été validée in-game.
+Le problème n’est pas fonctionnel — c’est <em>visuel</em> et <em>hiérarchique</em>. La frame fait
+~370 px de haut avec sept rangées empilées (header, target, action, mode, status, list, footer) qui
+se ressemblent toutes typographiquement, ce qui force l’œil à lire séquentiellement plutôt que de
+sauter au bon contrôle.</p>
+
+<div class="stage">
+  <div class="stage-tag">Shield · état actuel · 1:1</div>
+  <!-- Current Shield mockup -->
+  <div class="hud" style="width: 260px;">
+    <div class="head">
+      <span class="title">WARDENSHIELD</span>
+      <span class="hint">/wsh</span>
+      <span class="right">
+        <span class="glyph lock">o</span>
+        <span class="glyph x">x</span>
+      </span>
+    </div>
+    <div class="row">
+      <span class="dim">LIVE:</span>
+      <span class="c-mage">Patchs</span>
+      <span style="margin-left:auto"></span>
+      <span class="btn short">pick</span>
+    </div>
+    <div class="row">
+      <span class="btn" style="width:76px">los</span>
+      <span class="btn" style="width:76px">spells</span>
+      <span style="margin-left:auto"></span>
+      <span class="btn" style="width:56px">clear</span>
+    </div>
+    <div class="row tight">
+      <span class="btn gold" style="width:40px">cast</span>
+      <span class="btn" style="width:40px">on Y</span>
+      <span class="btn" style="width:50px">on me</span>
+      <span class="btn" style="width:40px">ban</span>
+      <span class="btn" style="width:40px">unban</span>
+    </div>
+    <div class="status">idle <span class="muted">·</span> 0 lines</div>
+    <div class="list" style="height: 190px;">
+      <div class="item"><span class="name">&gt; click [los] or [spells] above</span></div>
+      <div class="item"><span class="name">&gt; with a bot targeted</span></div>
+    </div>
+    <div class="foot">
+      <span class="btn short">hide gray</span>
+      <span class="btn short">exclusions: 0</span>
+      <span class="grow"></span>
+      <span class="btn short">reset</span>
+    </div>
+  </div>
+  <div class="stage-caption">State actuel — toutes les rangées partagent la même hauteur 22 px et la même typographie, ce qui aplatit la hiérarchie. La rangée mode a cinq boutons indépendants alors qu’elle représente <em>un choix mutuellement exclusif</em>.</div>
+</div>
+
+<h3>Frictions identifiées</h3>
+<ul>
+  <li><strong>Le mode actif n’a pas de poids visuel</strong>. Cinq boutons stone alignés se font concurrence ; seule la bordure gold le distingue, et c’est à 1 px sur une UI à 11 px. La lecture demande un effort.</li>
+  <li><strong>La cible verrouillée se perd dans la rangée TARGET</strong>. <code>LIVE: Patchs</code> et <code>LOCKED: Patchs</code> se ressemblent — l’un suit le live, l’autre est gelé ; rien dans le ton ne signale lequel.</li>
+  <li><strong>Capture state vit dans le status text</strong>. <code>listening 3.2s · 12 lines</code> est une phrase, pas un signal. À l’œil, la frame entière a l’air idle même quand elle écoute.</li>
+  <li><strong>Les bans sont invisibles sur la capture list</strong>. L’utilisateur doit toggler <code>[exclusions: N]</code> pour vérifier — alors que la décision « bannir ou non » se prend en regardant la spell list.</li>
+  <li><strong>Pas de section headers</strong>. Le bot whisper renvoie <code>=== Spells ===</code> et <code>--- Game objects ---</code> ; ces lignes sont filtrées au lieu d’être stylisées en séparateurs.</li>
+  <li><strong>Pas de filtre texte</strong>. Sur une whisper de 80 sorts, scroll-trouver « Heal » est lent.</li>
+  <li><strong>Le footer empile trois boutons hétérogènes</strong> (toggle filter, toggle view, action destructive) sans grouping.</li>
+</ul>
+
+<!-- =================== 3. SHIELD PRINCIPLES =================== -->
+<h2 id="shield-principles"><span class="num">3.</span>Shield — principes de refonte</h2>
+
+<ol>
+  <li><strong>La cible est l’ancre</strong>. Le bot verrouillé occupe une bande dédiée en tête, plus haute (28 px), classe en couleur en grand. Quand rien n’est verrouillé, cette bande montre la live target en italique/dim — c’est un sas, pas une rangée d’égale importance.</li>
+  <li><strong>Capture state &gt; status text</strong>. Quand la fenêtre de capture est ouverte, une <em>armed banner</em> ambrée apparaît sous le header (4 px de haut) — identique au pattern que Pocket utilisera pour <code>Listening...</code>. Plus besoin de relire le status.</li>
+  <li><strong>Mode = segmented control</strong>. Les cinq boutons « cast / on Y / on me / ban / unban » deviennent un seul widget visuellement uni (un bouton n’est <em>jamais</em> activable seul ; un seul état actif à la fois). On gagne 1 frontière sur 5, et le mode actif est lu comme un sélecteur.</li>
+  <li><strong>Banned dans la capture list</strong>. Les sorts bannis dans la liste capturée sont rendus strike-through avec un point rouge à gauche. Plus besoin de basculer pour vérifier. <code>[exclusions: N]</code> devient une <em>vue alternée</em>, pas un mécanisme de check.</li>
+  <li><strong>Section headers visibles</strong>. <code>=== Spells ===</code> devient une ligne de séparation typographique gold-rim, scrollable comme les autres mais non-cliquable. Le scroll-to-section devient naturel.</li>
+  <li><strong>Filtre texte conditionnel</strong>. Une petite editbox apparaît au-dessus de la liste dès qu’on dépasse 20 items. Sous 20, espace inutile — invisible.</li>
+  <li><strong>Footer = utility strip discrète</strong>. Trois icônes-boutons compacts (filter / view / reset) tous à 18 px, sans label pour les toggles binaires — un glyphe + couleur active suffit.</li>
+</ol>
+
+<!-- =================== 4. SHIELD MOCKUP =================== -->
+<h2 id="shield-mockup"><span class="num">4.</span>Shield — maquette refonte</h2>
+
+<p>La frame conserve sa largeur de 260 px et reste un sibling de Sword. La hauteur passe de ~370 à ~360 px, sans rien retirer fonctionnellement.</p>
+
+<div class="stage row">
+  <!-- IDLE -->
+  <div>
+    <div class="hud" style="width: 260px;">
+      <div class="head">
+        <span class="title">WARDENSHIELD</span>
+        <span class="hint">/wsh</span>
+        <span class="right">
+          <span class="glyph lock">o</span>
+          <span class="glyph x">x</span>
+        </span>
+      </div>
+      <!-- Target anchor row -->
+      <div class="row" style="height: 32px; padding-top: 4px; padding-bottom: 4px; flex-direction: column; align-items: flex-start; gap: 1px;">
+        <div style="display:flex; align-items:center; gap:6px; width:100%;">
+          <span style="font: 600 13px/1 'Helvetica Neue', sans-serif;" class="muted">no target</span>
+          <span style="margin-left:auto;"></span>
+          <span class="btn short">pick</span>
+        </div>
+        <div class="muted" style="font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase;">target a bot, then click pick</div>
+      </div>
+      <div class="rule"></div>
+      <!-- Action row -->
+      <div class="row">
+        <span class="btn" style="width:76px" disabled>los</span>
+        <span class="btn" style="width:76px" disabled>spells</span>
+        <span style="margin-left:auto"></span>
+        <span class="btn" disabled>clear</span>
+      </div>
+      <!-- Mode segmented control -->
+      <div style="padding: 4px 8px 0;">
+        <div class="seg" style="width: 100%;">
+          <span class="opt on">cast</span>
+          <span class="opt">on Y</span>
+          <span class="opt">on me</span>
+          <span class="opt">ban</span>
+          <span class="opt">unban</span>
+        </div>
+      </div>
+      <div class="status" style="margin-top: 4px;">
+        <span style="width:6px; height:6px; border-radius:50%; background: var(--stone-rim);"></span>
+        idle
+      </div>
+      <!-- List -->
+      <div class="list" style="height: 190px; align-items: center; justify-content: center;">
+        <div style="text-align:center; padding: 40px 20px;" class="muted">
+          <div style="font: 600 11px/1.6 'Helvetica Neue', sans-serif; letter-spacing: 0.06em;">NO CAPTURE</div>
+          <div style="font: 11px/1.4 'Charter', Georgia, serif; font-style: italic; margin-top:8px; color: #6e6552;">
+            target a bot in-game,<br>then click [los] or [spells]
+          </div>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="btn short" title="hide gray spells">▤</span>
+        <span class="btn short">exclusions <span class="muted">·</span> 0</span>
+        <span class="grow"></span>
+        <span class="btn short" style="color: var(--ink-red); border-color: #5a2018;">reset all</span>
+      </div>
+    </div>
+    <div class="figure-cap">État idle — pas de capture, pas de target.<br>L’ancre TARGET montre l’invite à l’action.</div>
+  </div>
+
+  <!-- ARMED + CAPTURING -->
+  <div>
+    <div class="hud" style="width: 260px;">
+      <div class="head">
+        <span class="title">WARDENSHIELD</span>
+        <span class="hint">/wsh</span>
+        <span class="right">
+          <span class="glyph lock on">*</span>
+          <span class="glyph x">x</span>
+        </span>
+      </div>
+      <!-- ARMED banner — appears only during capture -->
+      <div class="armed-banner">
+        <span class="blip"></span>
+        LISTENING <span style="margin-left:auto" class="gold">3.2s · 17 lines</span>
+      </div>
+      <!-- Target anchor row -->
+      <div class="row" style="height: 32px; padding-top: 4px; padding-bottom: 4px; flex-direction: column; align-items: flex-start; gap: 1px;">
+        <div style="display:flex; align-items:center; gap:6px; width:100%;">
+          <span style="font: 600 13px/1 'Helvetica Neue', sans-serif;" class="c-mage">Patchs</span>
+          <span class="muted" style="font-size:10px;">Mage</span>
+          <span style="margin-left:auto;"></span>
+          <span class="btn short">pick</span>
+        </div>
+        <div class="gold" style="font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase;">◉ locked</div>
+      </div>
+      <div class="rule"></div>
+      <!-- Action row -->
+      <div class="row">
+        <span class="btn" style="width:76px">los</span>
+        <span class="btn armed" style="width:76px">spells</span>
+        <span style="margin-left:auto"></span>
+        <span class="btn">clear</span>
+      </div>
+      <!-- Mode segmented control -->
+      <div style="padding: 4px 8px 0;">
+        <div class="seg" style="width: 100%;">
+          <span class="opt on">cast</span>
+          <span class="opt">on Y</span>
+          <span class="opt">on me</span>
+          <span class="opt">ban</span>
+          <span class="opt">unban</span>
+        </div>
+      </div>
+      <!-- Filter (only when &gt; 20 items) -->
+      <div style="padding: 4px 8px 0;">
+        <div class="editbox linkbox" style="width: 100%; box-sizing: border-box; font-size: 10.5px;">
+          <span class="muted" style="margin-right:6px;">filter</span>
+          <span class="warm">heal</span>
+        </div>
+      </div>
+      <!-- List -->
+      <div class="list" style="height: 170px; overflow: hidden;">
+        <div class="section-hdr">Spells <span class="ln"></span> <span class="muted" style="font-weight: 400; text-transform: none; letter-spacing: 0;">28</span></div>
+        <div class="item"><span class="name warm">Flash Heal</span><span class="tag usable">yellow</span></div>
+        <div class="item"><span class="name warm">Greater Heal</span><span class="tag usable">yellow</span></div>
+        <div class="item banned"><span class="dot"></span><span class="name">Heal</span><span class="tag gray">gray</span></div>
+        <div class="item"><span class="name warm">Lesser Heal</span><span class="tag gray">gray</span></div>
+        <div class="item"><span class="name warm">Prayer of Healing</span><span class="tag usable">yellow</span></div>
+        <div class="item"><span class="name warm">Renew</span><span class="tag usable">yellow</span></div>
+        <div class="section-hdr">Game objects <span class="ln"></span> <span class="muted" style="font-weight: 400; text-transform: none; letter-spacing: 0;">3</span></div>
+        <div class="item"><span class="name warm">Brazier</span></div>
+      </div>
+      <div class="foot">
+        <span class="btn short gold" title="hide gray spells">▤</span>
+        <span class="btn short">exclusions <span class="muted">·</span> 1</span>
+        <span class="grow"></span>
+        <span class="btn short" style="color: var(--ink-red); border-color: #5a2018;">reset all</span>
+      </div>
+    </div>
+    <div class="figure-cap">État armed — capture en cours sur Patchs, mode <em>cast</em>, filtre « heal ».<br>Heal est déjà banned : barré rouge, point rouge.</div>
+  </div>
+</div>
+
+<h3>États clés annotés</h3>
+
+<div class="stage row">
+  <!-- caston with no target captured yet -->
+  <div>
+    <div class="hud" style="width: 260px;">
+      <div class="head">
+        <span class="title">WARDENSHIELD</span>
+        <span class="hint">/wsh</span>
+        <span class="right"><span class="glyph lock on">*</span><span class="glyph x">x</span></span>
+      </div>
+      <div class="row" style="height: 32px; padding-top: 4px; padding-bottom: 4px; flex-direction: column; align-items: flex-start; gap: 1px;">
+        <div style="display:flex; align-items:center; gap:6px; width:100%;">
+          <span style="font: 600 13px/1 'Helvetica Neue', sans-serif;" class="c-mage">Patchs</span>
+          <span class="muted" style="font-size:10px;">Mage</span>
+          <span style="margin-left:auto;"></span>
+          <span class="btn short">pick</span>
+        </div>
+        <div class="gold" style="font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase;">◉ locked</div>
+      </div>
+      <div class="rule"></div>
+      <div class="row">
+        <span class="btn" style="width:76px">los</span>
+        <span class="btn" style="width:76px">spells</span>
+        <span style="margin-left:auto"></span>
+        <span class="btn">clear</span>
+      </div>
+      <div style="padding: 4px 8px 0;">
+        <div class="seg" style="width: 100%;">
+          <span class="opt">cast</span>
+          <span class="opt on">on Y</span>
+          <span class="opt">on me</span>
+          <span class="opt">ban</span>
+          <span class="opt">unban</span>
+        </div>
+      </div>
+      <!-- cast-on target chip — NEW : sa propre rangée, gold dashed -->
+      <div style="margin: 6px 8px 0; padding: 6px 8px; border: 1px dashed var(--gold-rim); background: rgba(255,209,0,0.04); font: 600 10px/1 'Helvetica Neue', sans-serif; letter-spacing: 0.04em; color: var(--gold-dim); text-align: center;">
+        click a unit frame to set cast target
+      </div>
+      <div class="list" style="height: 154px; padding-top: 6px;">
+        <div class="section-hdr">Spells <span class="ln"></span></div>
+        <div class="item"><span class="name warm">Frost Nova</span><span class="tag usable">yellow</span></div>
+        <div class="item"><span class="name warm">Polymorph</span><span class="tag usable">yellow</span></div>
+        <div class="item"><span class="name warm">Counterspell</span><span class="tag usable">yellow</span></div>
+      </div>
+      <div class="foot">
+        <span class="btn short" title="hide gray">▤</span>
+        <span class="btn short">exclusions <span class="muted">·</span> 0</span>
+        <span class="grow"></span>
+        <span class="btn short" style="color: var(--ink-red); border-color: #5a2018;">reset all</span>
+      </div>
+    </div>
+    <div class="figure-cap"><code>on Y</code> sélectionné, target non capturée encore.<br>Chip dashed gold dim — message clair sans clutter.</div>
+  </div>
+
+  <!-- caston with captured target -->
+  <div>
+    <div class="hud" style="width: 260px;">
+      <div class="head">
+        <span class="title">WARDENSHIELD</span>
+        <span class="hint">/wsh</span>
+        <span class="right"><span class="glyph lock on">*</span><span class="glyph x">x</span></span>
+      </div>
+      <div class="row" style="height: 32px; padding-top: 4px; padding-bottom: 4px; flex-direction: column; align-items: flex-start; gap: 1px;">
+        <div style="display:flex; align-items:center; gap:6px; width:100%;">
+          <span style="font: 600 13px/1 'Helvetica Neue', sans-serif;" class="c-mage">Patchs</span>
+          <span class="muted" style="font-size:10px;">Mage</span>
+          <span style="margin-left:auto;"></span>
+          <span class="btn short">pick</span>
+        </div>
+        <div class="gold" style="font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase;">◉ locked</div>
+      </div>
+      <div class="rule"></div>
+      <div class="row">
+        <span class="btn" style="width:76px">los</span>
+        <span class="btn" style="width:76px">spells</span>
+        <span style="margin-left:auto"></span>
+        <span class="btn">clear</span>
+      </div>
+      <div style="padding: 4px 8px 0;">
+        <div class="seg" style="width: 100%;">
+          <span class="opt">cast</span>
+          <span class="opt on">on Y</span>
+          <span class="opt">on me</span>
+          <span class="opt">ban</span>
+          <span class="opt">unban</span>
+        </div>
+      </div>
+      <!-- cast-on target chip — captured -->
+      <div style="margin: 6px 8px 0; padding: 6px 8px; border: 1px solid var(--gold-rim); background: rgba(255,209,0,0.08); font: 600 10px/1 'Helvetica Neue', sans-serif; letter-spacing: 0.04em; text-align: center; display: flex; align-items: center; gap: 6px;">
+          <span class="gold" style="font-size: 9px;">CAST ON</span>
+          <span style="flex:1; text-align:left;" class="c-priest">Valleriaa</span>
+          <span class="muted" style="font-size: 9px;">priest</span>
+      </div>
+      <div class="list" style="height: 154px; padding-top: 6px;">
+        <div class="section-hdr">Spells <span class="ln"></span></div>
+        <div class="item"><span class="name warm">Flash Heal</span><span class="tag usable">yellow</span></div>
+        <div class="item"><span class="name warm">Greater Heal</span><span class="tag usable">yellow</span></div>
+        <div class="item"><span class="name warm">Renew</span><span class="tag usable">yellow</span></div>
+      </div>
+      <div class="foot">
+        <span class="btn short" title="hide gray">▤</span>
+        <span class="btn short">exclusions <span class="muted">·</span> 0</span>
+        <span class="grow"></span>
+        <span class="btn short" style="color: var(--ink-red); border-color: #5a2018;">reset all</span>
+      </div>
+    </div>
+    <div class="figure-cap"><code>on Y</code> + cible capturée.<br>Chip plein gold, classe colorée. Clicker un sort envoie <code>cast Flash Heal on Valleriaa</code>.</div>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="stage-tag">Shield · vue exclusions · 1:1</div>
+  <div class="hud" style="width: 260px;">
+    <div class="head">
+      <span class="title">WARDENSHIELD</span>
+      <span class="hint">/wsh</span>
+      <span class="right"><span class="glyph lock on">*</span><span class="glyph x">x</span></span>
+    </div>
+    <div class="row" style="height: 32px; padding-top: 4px; padding-bottom: 4px; flex-direction: column; align-items: flex-start; gap: 1px;">
+      <div style="display:flex; align-items:center; gap:6px; width:100%;">
+        <span style="font: 600 13px/1 'Helvetica Neue', sans-serif;" class="c-mage">Patchs</span>
+        <span class="muted" style="font-size:10px;">Mage</span>
+        <span style="margin-left:auto;"></span>
+        <span class="btn short">pick</span>
+      </div>
+      <div class="gold" style="font-size: 9.5px; letter-spacing: 0.10em; text-transform: uppercase;">◉ locked</div>
+    </div>
+    <div class="rule"></div>
+    <div class="row">
+      <span class="btn" style="width:76px">los</span>
+      <span class="btn" style="width:76px">spells</span>
+      <span style="margin-left:auto"></span>
+      <span class="btn">clear</span>
+    </div>
+    <div style="padding: 4px 8px 0;">
+      <div class="seg" style="width: 100%;">
+        <span class="opt">cast</span>
+        <span class="opt">on Y</span>
+        <span class="opt">on me</span>
+        <span class="opt">ban</span>
+        <span class="opt on">unban</span>
+      </div>
+    </div>
+    <!-- A subtle title showing we're in exclusions view -->
+    <div style="padding: 6px 10px 4px; font: 600 9.5px/1 'Helvetica Neue', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-red); border-top: 1px solid var(--stone-rim); margin-top: 6px;">
+      Viewing exclusions — click to unban
+    </div>
+    <div class="list" style="height: 178px;">
+      <div class="item excl"><span class="dot" style="background: var(--ink-red); width: 6px; height: 6px; border-radius:50%;"></span><span class="name">Heal</span><span class="muted" style="font-size: 9.5px;">id 2050</span></div>
+      <div class="item excl"><span class="dot" style="background: var(--ink-red); width: 6px; height: 6px; border-radius:50%;"></span><span class="name">Lesser Heal</span><span class="muted" style="font-size: 9.5px;">id 2052</span></div>
+      <div class="item excl"><span class="dot" style="background: var(--ink-red); width: 6px; height: 6px; border-radius:50%;"></span><span class="name">Polymorph: Pig</span><span class="muted" style="font-size: 9.5px;">id 28272</span></div>
+    </div>
+    <div class="foot">
+      <span class="btn short" title="hide gray">▤</span>
+      <span class="btn short gold">exclusions <span style="opacity:0.6">·</span> 3</span>
+      <span class="grow"></span>
+      <span class="btn short" style="color: var(--ink-red); border-color: #5a2018;">reset all</span>
+    </div>
+  </div>
+  <div class="stage-caption">Vue exclusions activée. Bouton <code>exclusions: 3</code> en gold, titre rouge sous la mode-bar pour signaler qu’on n’est plus sur la capture courante. <code>reset all</code> ne devient destructive (rouge accent) que quand il y a effectivement des exclusions à wipe.</div>
+</div>
+
+<!-- =================== 5. SHIELD QA =================== -->
+<h2 id="shield-qa"><span class="num">5.</span>Shield — réponses aux 8 questions ouvertes</h2>
+
+<p>Le feature brief 2026-04-28 liste 8 décisions UX implicites. Réponses prises pour la refonte :</p>
+
+<div class="qa">
+  <div class="q-num">1</div>
+  <div class="q">Le picker <code>on Y</code> capture tout target change. Doit-on durcir à « click sur UnitFrame » ?</div>
+  <div class="a"><span class="verdict no">non</span>On garde le comportement actuel. Le coût d’un tab-target accidentel est faible (le user voit immédiatement le chip <code>CAST ON: Wrongname</code> et re-cliquera). Restreindre à un click UnitFrame demande du SecureActionButton ou un hook OnEnter sur tous les frames du raid — trop d’infrastructure pour un bug rare.</div>
+</div>
+
+<div class="qa">
+  <div class="q-num">2</div>
+  <div class="q">Les sorts bannis sont invisibles dans la capture list. Marquer ?</div>
+  <div class="a"><span class="verdict">oui</span><strong>Strike-through + point rouge</strong> (cf. mockup armed). Aucun toggle requis ; le user voit immédiatement, dans la même liste où il décide de bannir, ce qui est déjà banni. Code : un O(1) lookup dans <code>db.shield.exclusions</code> indexé par <code>id</code> pendant <code>buildDisplayItems()</code>.</div>
+</div>
+
+<div class="qa">
+  <div class="q-num">3</div>
+  <div class="q"><code>hide gray</code> filtre tout, y compris en mode <code>ban</code>. Mode-aware ?</div>
+  <div class="a"><span class="verdict">oui</span>En mode <code>ban</code> ou <code>unban</code>, le filtre <code>hide gray</code> est automatiquement bypassé — l’utilisateur veut bannir des sorts <em>même</em> si le bot ne peut pas les caster maintenant (souvent à cause d’un mauvais rank). Le bouton reste affiché mais sa bordure passe en disabled state (stone_rim + label dim) pendant ces modes pour signaler l’inactivité.</div>
+</div>
+
+<div class="qa">
+  <div class="q-num">4</div>
+  <div class="q">200 px de liste pour 50+ sorts est lent. Champ de filtre texte ?</div>
+  <div class="a"><span class="verdict">oui, conditionnel</span>Editbox 18 px de haut, apparaît au-dessus de la liste <strong>uniquement quand <code>#displayItems &gt; 20</code></strong>. Sous le seuil, la place est rendue à la liste. Filtrage case-insensitive sur <code>line.payload</code>. La filtre persiste pendant la session mais se wipe sur <code>[clear]</code> et sur changement de mode discovery.</div>
+</div>
+
+<div class="qa">
+  <div class="q-num">5</div>
+  <div class="q">Capture rows mélangées de plusieurs bots — préfixe bot ?</div>
+  <div class="a"><span class="verdict maybe">conditionnel</span>Pas par défaut (clutter sur 95 % des cas où il n’y a qu’un bot). Mais si <code>state.lines</code> contient des entrées dont <code>line.from</code> diffère, on injecte automatiquement un mini-tag bot (8 px, gold_dim, classe-colorée) à droite de chaque row. Implémentation : check sur la longueur de <code>distinct(line.from)</code> dans <code>buildDisplayItems</code>.</div>
+</div>
+
+<div class="qa">
+  <div class="q-num">6</div>
+  <div class="q">La frame est passée à ~370 px. Compacter ?</div>
+  <div class="a"><span class="verdict">oui, partiellement</span>La refonte vise 360 px en moyenne (sans armed banner) et 368 px avec armed banner. Le gain vient de :
+    <ul style="margin-top:4px;">
+      <li>Statusrow fusionnée dans l’armed banner quand on capture, et invisible quand idle (économie de 16 px en running state).</li>
+      <li>Mode segmented control au lieu de 5 boutons séparés (économie de 6 px latéral, pas vertical).</li>
+      <li>Footer 18 px au lieu de mélanger des 22 et 18.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q-num">7</div>
+  <div class="q">Label <code>on &lt;Name&gt;</code> à droite de unban — clutter ?</div>
+  <div class="a"><span class="verdict">oui</span>Le label devient une <strong>rangée dédiée</strong> (« cast-on chip ») visible uniquement quand <code>actionMode == "caston"</code>. Bordure dashed quand vide (instruction), plein quand peuplé (status). Le clic sur le chip lui-même supprime la cible capturée (UX bonus, pas spec critique).</div>
+</div>
+
+<div class="qa">
+  <div class="q-num">8</div>
+  <div class="q"><code>=== Spells ===</code> filtrés ou rendus comme section headers ?</div>
+  <div class="a"><span class="verdict">rendus</span>Rendus en typo gold_rim 9.5 px tracking large + ligne 1 px à droite + compte d’items à l’extrême droite. Non-cliquables. <code>buildDisplayItems</code> insère des items <code>{kind = "section", label, count}</code> qui ont leur propre render path. Bonus : le user peut maintenant scroll-jumper visuellement entre Spells et Objects.</div>
+</div>
+
+<!-- =================== 6. SHIELD SPEC =================== -->
+<h2 id="shield-spec"><span class="num">6.</span>Shield — spec d’implémentation</h2>
+
+<h3>Nouvelles dimensions</h3>
+<table class="kv">
+  <tr><th>FRAME_W</th><td>260 (inchangé)</td></tr>
+  <tr><th>HEADER_H</th><td>22 (inchangé)</td></tr>
+  <tr><th>BANNER_H</th><td>16 — armed banner, conditionnel</td></tr>
+  <tr><th>TARGET_H</th><td>32 (augmenté de 22) — 2 lignes : name+pick / locked-state</td></tr>
+  <tr><th>ACTION_H</th><td>22 (inchangé)</td></tr>
+  <tr><th>MODE_H</th><td>22 (segmented control, full-width)</td></tr>
+  <tr><th>CAST_ON_H</th><td>22 — chip conditionnel (caston only)</td></tr>
+  <tr><th>FILTER_H</th><td>18 — conditionnel (>20 items)</td></tr>
+  <tr><th>LIST_H</th><td>variable — fill remaining vertical space</td></tr>
+  <tr><th>FOOTER_H</th><td>22 — uniformisé à 22 (était 18)</td></tr>
+</table>
+
+<h3>Nouvelles primitives à ajouter dans Core.lua</h3>
+<pre>-- ns.UI.Segmented.Create(parent, items, onChange) -&gt; frame
+--   items = { {key="cast", label="cast"}, {key="caston", label="on Y"}, ... }
+--   onChange(key) called when user clicks an option
+--   frame:SetActive(key)  -- repaint active option
+--
+-- ns.UI.Banner.Armed(parent, opts) -&gt; frame
+--   Renders the amber armed-banner with pulsing blip + countdown text.
+--   opts = { onUpdate = fn returning {seconds, lines} }
+--   frame:Arm(seconds) / frame:Disarm()</pre>
+
+<p>Les deux sont des helpers réutilisables (Pocket s’en sert aussi pour son Listening state).</p>
+
+<h3>Changements de logique dans Shield.lua</h3>
+<ul>
+  <li><code>buildDisplayItems</code> retourne maintenant des items <code>{kind = "section"|"line"|"excl", ...}</code>. Le render path branche sur <code>kind</code>.</li>
+  <li>Sections : un item <code>{kind="section", label, count}</code> est inséré <em>avant</em> chaque cluster de lignes du même type. Cluster déterminé par <code>line.mode</code> ou heuristique sur <code>line.raw</code>.</li>
+  <li>Banned-in-capture-list : lors du build, pour chaque <code>line</code> de type spells, on extrait <code>spellId = extractSpellId(line.raw)</code> et on lookup dans <code>db.shield.exclusions</code> ; si trouvé, <code>item.banned = true</code>.</li>
+  <li><code>hide gray</code> est court-circuité quand <code>state.actionMode == "ban"</code> ou <code>"unban"</code>.</li>
+  <li>Bot-prefix conditionnel : <code>local multiBot = countDistinct(state.lines, "from") &gt; 1</code> ; passé aux items.</li>
+  <li>Filtre texte : nouvelle var <code>state.filter</code> (string), checkée dans <code>buildDisplayItems</code> contre <code>line.payload:lower()</code>.</li>
+</ul>
+
+<h3>Persistence — pas de changement de schema</h3>
+<p>Tout passe par <code>db.shield</code> existant. Les états transitoires (filter text, multi-bot detection, banned cache) sont runtime-only.</p>
+
+<!-- =================== 7. POCKET DIAGNOSTIC =================== -->
+<h2 id="pocket-overview"><span class="num">7.</span>Pocket — diagnostic de l’existant</h2>
+
+<p>Pocket fonctionne mais son interface lit plate. La frame est <em>tout</em> du même rang typographique : titre, status, offers, footer. Le user a besoin de lire activement pour savoir où il en est. Or l’usage typique (annoncer en /1, attendre des bids, inviter le meilleur) implique des transitions d’état que la UI ne dramatise pas.</p>
+
+<div class="stage">
+  <div class="stage-tag">Pocket · état actuel · 1:1</div>
+  <div class="hud" style="width: 280px;">
+    <div class="head">
+      <span class="title" style="font-weight: 400; text-transform: none; letter-spacing: 0;">Warden Pocket</span>
+      <span class="right"><span class="glyph x">×</span></span>
+    </div>
+    <div class="row" style="height: 30px; gap: 8px;">
+      <span class="muted" style="font-size: 11px;">Item:</span>
+      <span class="pocket-item-slot filled"><span class="ic"></span></span>
+      <span class="editbox linkbox"><span class="link">[Spice Bread]</span></span>
+      <span class="btn red" style="width: 50px;">WTS</span>
+    </div>
+    <div style="padding: 4px 10px; font: 11px/1 'Helvetica Neue', sans-serif;" class="amber">Listening...</div>
+    <div style="background: var(--stone-dark); height: 180px; padding: 4px 8px; display: flex; flex-direction: column; gap: 0;">
+      <div class="pocket-offer zebra"><span class="gold">Sneakily</span><span></span><span class="gold">12g 21s</span></div>
+      <div class="pocket-offer zebra"><span class="warm">Mooshie</span><span></span><span class="warm">9g 5s</span></div>
+      <div class="pocket-offer zebra"><span class="warm">Botzar</span><span></span><span class="warm">7g</span></div>
+      <div class="pocket-offer zebra"><span class="warm">Crustyfeet</span><span></span><span class="warm">5g 50s</span></div>
+      <div class="pocket-offer zebra"><span class="warm">Brewmaister</span><span></span><span class="warm">2g 99s</span></div>
+    </div>
+    <div class="foot" style="height: 22px;">
+      <span class="btn short">Clear</span>
+      <span class="muted" style="font-size: 10px;">Top:</span>
+      <span class="editbox num">20</span>
+      <span class="muted" style="font-size: 10px;">Wait:</span>
+      <span class="editbox num">30</span><span class="muted" style="font-size: 10px;">s</span>
+      <span class="grow"></span>
+      <span class="btn short">Stop</span>
+    </div>
+  </div>
+  <div class="stage-caption">État actuel — armed, 5 offers reçues. « Listening... » est une ligne de texte ; rien d’autre ne signale que la frame écoute activement. La hiérarchie price/name est plate.</div>
+</div>
+
+<h3>Frictions identifiées</h3>
+<ul>
+  <li><strong>Pas de signal d’armed</strong>. Le seul indicateur est <code>|cffffaa00Listening...|r</code> en texte. À l’œil, la frame en armed et la frame en idle se ressemblent à 95 %.</li>
+  <li><strong>Le best bid est juste « plus gold »</strong>. Sur 20 offers à l’écran, le #1 doit être instantanément lisible — il ne l’est pas.</li>
+  <li><strong>Top: et Wait: sont des champs nus</strong>. Ils règlent <em>la même règle</em> (« quand auto-inviter ») mais sont posés à plat sans grouping. Un user qui voit Pocket pour la première fois ne devine pas qu’il s’agit d’un OR-cap.</li>
+  <li><strong>Trade banner détachée</strong>. Quand TRADE_SHOW fire, la banner apparaît au centre de l’écran — déconnectée visuellement de Pocket alors qu’elle en est la suite logique.</li>
+  <li><strong>L’état <code>Invited</code> est terminal mais discret</strong>. « Invited Sneakily (12g 21s) » en vert, c’est la victoire — mais visuellement c’est la même rangée que le idle.</li>
+</ul>
+
+<!-- =================== 8. POCKET PRINCIPLES =================== -->
+<h2 id="pocket-principles"><span class="num">8.</span>Pocket — principes de refonte</h2>
+
+<ol>
+  <li><strong>Trois phases visuellement distinctes</strong>. <em>Idle</em> (gris-stone), <em>Listening</em> (banner ambrée pulsée en tête), <em>Invited</em> (banner verte fixe). Ces trois états doivent être identifiables en vision périphérique.</li>
+  <li><strong>Le #1 occupe une rangée dédiée</strong>. Hauteur 28 px (vs 18 pour les autres), background gold faiblement teinté, accent gauche gold solide. Le #2 est en 22 px, semi-gras. Le reste à 18 px régulier. Décroissance visuelle = décroissance de pertinence.</li>
+  <li><strong>Auto-invite rule = une phrase</strong>. Au lieu de « Top: 20  Wait: 30s » on lit « Auto-invite at 20 offers or after 30s — whichever first ». Les numbers restent éditables in-place mais sont incrustés dans la phrase.</li>
+  <li><strong>Trade banner = action bar dockée</strong>. Quand TRADE_SHOW fire et que la frame Pocket est visible, la banner remplace le footer (action bar dockée). Quand la frame Pocket est cachée, la banner flotte (comportement actuel). Plus de double-frame en concurrence à l’écran.</li>
+  <li><strong>Item slot plus grand</strong>. 32×32 au lieu de 22×22 — c’est la première chose qu’on remplit. Quand vide, hint « drop item here » en italique gold_dim.</li>
+</ol>
+
+<!-- =================== 9. POCKET MOCKUP =================== -->
+<h2 id="pocket-mockup"><span class="num">9.</span>Pocket — maquette refonte</h2>
+
+<div class="stage row">
+  <!-- IDLE -->
+  <div>
+    <div class="hud" style="width: 280px;">
+      <div class="head">
+        <span class="title">WARDEN POCKET</span>
+        <span class="hint">/wp</span>
+        <span class="right"><span class="glyph x">x</span></span>
+      </div>
+      <div style="padding: 10px 10px 8px; display: flex; align-items: center; gap: 10px;">
+        <div class="pocket-item-slot empty" style="width: 32px; height: 32px;">+</div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 3px;">
+          <div class="editbox linkbox" style="width: 100%; box-sizing: border-box; height: 22px;">
+            <span class="muted" style="font-style: italic; font-size: 10.5px;">drop item or shift-click from bag</span>
+          </div>
+          <div class="muted" style="font-size: 9.5px; letter-spacing: 0.05em;">channel 1 / General</div>
+        </div>
+        <span class="btn red" style="width: 56px; height: 32px;" disabled>WTS</span>
+      </div>
+      <div class="rule"></div>
+      <div style="padding: 8px 10px 6px;">
+        <div class="muted" style="font: 10.5px/1.4 'Charter', Georgia, serif; font-style: italic;">
+          Auto-invite top bidder after
+          <span class="warm" style="font-style: normal;"><span class="editbox num" style="font-size: 10.5px; display: inline-flex; height: 16px;">20</span></span> offers
+          or
+          <span class="warm" style="font-style: normal;"><span class="editbox num" style="font-size: 10.5px; display: inline-flex; height: 16px;">30</span></span> seconds —
+          whichever first.
+        </div>
+      </div>
+      <div style="background: var(--stone-dark); height: 168px; padding: 24px 12px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px; border-top: 1px solid var(--stone-rim);">
+        <div style="font: 600 11px/1 'Helvetica Neue', sans-serif; letter-spacing: 0.10em; text-transform: uppercase;" class="muted">No offers yet</div>
+        <div style="font: 11px/1.5 'Charter', Georgia, serif; font-style: italic; text-align: center; max-width: 200px;" class="muted">drop an item above and hit WTS to broadcast a buy request to channel 1</div>
+      </div>
+      <div class="foot">
+        <span class="btn short">clear</span>
+        <span class="grow"></span>
+        <span class="btn short" disabled>stop</span>
+      </div>
+    </div>
+    <div class="figure-cap">État idle — slot vide, WTS désactivé. La règle d’auto-invite est lisible comme une phrase.</div>
+  </div>
+
+  <!-- ARMED -->
+  <div>
+    <div class="hud" style="width: 280px;">
+      <div class="head">
+        <span class="title">WARDEN POCKET</span>
+        <span class="hint">/wp</span>
+        <span class="right"><span class="glyph x">x</span></span>
+      </div>
+      <!-- ARMED BANNER -->
+      <div class="armed-banner">
+        <span class="blip"></span>
+        LISTENING
+        <span style="margin-left:auto" class="gold">22s left · 5 offers</span>
+      </div>
+      <div style="padding: 8px 10px 6px; display: flex; align-items: center; gap: 10px;">
+        <div class="pocket-item-slot filled" style="width: 32px; height: 32px;"><span class="ic"></span></div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+          <div class="warm" style="font: 600 12px/1.2 'Helvetica Neue', sans-serif;">Spice Bread</div>
+          <div class="muted" style="font-size: 9.5px;">broadcast to /1</div>
+        </div>
+        <span class="btn" style="width: 56px; height: 32px;">re-WTS</span>
+      </div>
+      <div class="rule"></div>
+      <!-- best offer rail -->
+      <div style="background: var(--stone-dark); padding: 4px 0;">
+        <div class="pocket-offer top">
+          <span class="crown">★</span>
+          <span class="name">Sneakily</span>
+          <span class="price">12g 21s</span>
+        </div>
+        <div class="pocket-offer second">
+          <span class="crown muted">·</span>
+          <span class="name">Mooshie</span>
+          <span class="price">9g 5s</span>
+        </div>
+        <div class="pocket-offer">
+          <span class="crown muted">·</span>
+          <span class="name muted">Botzar</span>
+          <span class="price muted">7g</span>
+        </div>
+        <div class="pocket-offer">
+          <span class="crown muted">·</span>
+          <span class="name muted">Crustyfeet</span>
+          <span class="price muted">5g 50s</span>
+        </div>
+        <div class="pocket-offer">
+          <span class="crown muted">·</span>
+          <span class="name muted">Brewmaister</span>
+          <span class="price muted">2g 99s</span>
+        </div>
+        <div style="height: 80px;"></div>
+      </div>
+      <div class="foot">
+        <span class="btn short">clear</span>
+        <span class="muted" style="font: 10px/1.3 'Charter', Georgia, serif; font-style: italic; padding: 0 6px;">5/20 offers · auto-invite in 22s</span>
+        <span class="grow"></span>
+        <span class="btn short">stop</span>
+      </div>
+    </div>
+    <div class="figure-cap">Armed — 5 offers reçues. Sneakily est <em>visiblement</em> en tête.<br>Le footer condense le statut au lieu de cacher les seuils.</div>
+  </div>
+</div>
+
+<div class="stage row">
+  <!-- INVITED -->
+  <div>
+    <div class="hud" style="width: 280px;">
+      <div class="head">
+        <span class="title">WARDEN POCKET</span>
+        <span class="hint">/wp</span>
+        <span class="right"><span class="glyph x">x</span></span>
+      </div>
+      <!-- INVITED banner (green variant) -->
+      <div class="armed-banner" style="background: linear-gradient(180deg, rgba(46,204,64,0.20), rgba(46,204,64,0.04)); border-bottom-color: rgba(46,204,64,0.4); color: var(--green);">
+        <span class="blip" style="background: var(--green); box-shadow: 0 0 6px var(--green); animation: none;"></span>
+        INVITED <span class="warm">SNEAKILY</span>
+        <span style="margin-left:auto" class="green">12g 21s</span>
+      </div>
+      <div style="padding: 8px 10px 6px; display: flex; align-items: center; gap: 10px;">
+        <div class="pocket-item-slot filled" style="width: 32px; height: 32px;"><span class="ic"></span></div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+          <div class="warm" style="font: 600 12px/1.2 'Helvetica Neue', sans-serif;">Spice Bread</div>
+          <div class="muted" style="font-size: 9.5px;">waiting for trade window…</div>
+        </div>
+      </div>
+      <div class="rule"></div>
+      <div style="background: var(--stone-dark); padding: 4px 0;">
+        <div class="pocket-offer top">
+          <span class="crown">★</span>
+          <span class="name">Sneakily</span>
+          <span class="price">12g 21s</span>
+        </div>
+        <div class="pocket-offer second">
+          <span class="crown muted">·</span>
+          <span class="name muted">Mooshie</span>
+          <span class="price muted">9g 5s</span>
+        </div>
+        <div class="pocket-offer">
+          <span class="crown muted">·</span>
+          <span class="name muted">Botzar</span>
+          <span class="price muted">7g</span>
+        </div>
+        <div style="height: 122px;"></div>
+      </div>
+      <div class="foot">
+        <span class="btn short" style="color: var(--ink-red); border-color: #5a2018;">kick &amp; clear</span>
+        <span class="grow"></span>
+        <span class="muted" style="font: 10px/1.3 'Charter', Georgia, serif; font-style: italic; padding: 0 6px;">trade window opens, banner docks below</span>
+      </div>
+    </div>
+    <div class="figure-cap">Invited — banner verte, Sneakily promu, controls deviennent « kick &amp; clear ».</div>
+  </div>
+
+  <!-- TRADE BANNER DOCKED -->
+  <div>
+    <div class="hud" style="width: 280px;">
+      <div class="head">
+        <span class="title">WARDEN POCKET</span>
+        <span class="hint">/wp</span>
+        <span class="right"><span class="glyph x">x</span></span>
+      </div>
+      <div class="armed-banner" style="background: linear-gradient(180deg, rgba(46,204,64,0.20), rgba(46,204,64,0.04)); border-bottom-color: rgba(46,204,64,0.4); color: var(--green);">
+        <span class="blip" style="background: var(--green); box-shadow: 0 0 6px var(--green); animation: none;"></span>
+        TRADE OPEN <span class="warm">SNEAKILY</span>
+      </div>
+      <div style="padding: 8px 10px 6px; display: flex; align-items: center; gap: 10px;">
+        <div class="pocket-item-slot filled" style="width: 32px; height: 32px;"><span class="ic"></span></div>
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+          <div class="warm" style="font: 600 12px/1.2 'Helvetica Neue', sans-serif;">Spice Bread</div>
+          <div class="muted" style="font-size: 9.5px;">unit price <span class="gold">12g 21s</span></div>
+        </div>
+      </div>
+      <div class="rule"></div>
+      <!-- DOCKED TRADE ACTION BAR -->
+      <div style="background: linear-gradient(180deg, var(--stone-mid), var(--stone-dark)); padding: 12px 10px;">
+        <div style="font: 600 9.5px/1 'Helvetica Neue', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-rim); margin-bottom: 8px;">Set price for trade</div>
+        <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: var(--stone-dark); border: 1px solid var(--gold-rim);">
+          <span class="editbox num" style="height: 22px;">1</span>
+          <span class="muted">×</span>
+          <span class="gold" style="font-weight: 600;">12g 21s</span>
+          <span class="muted">=</span>
+          <span style="flex: 1; text-align: right; font: 700 14px/1 'Helvetica Neue', sans-serif;" class="gold">12g 21s</span>
+        </div>
+        <div style="display: flex; gap: 6px; margin-top: 8px;">
+          <span class="btn" style="flex: 1;">whisper total</span>
+          <span class="btn gold" style="flex: 1;">whisper + accept</span>
+        </div>
+      </div>
+      <div class="foot">
+        <span class="btn short" style="color: var(--ink-red); border-color: #5a2018;">kick &amp; clear</span>
+        <span class="grow"></span>
+        <span class="muted" style="font: 10px/1.3 'Charter', Georgia, serif; font-style: italic; padding: 0 6px;">close trade to return</span>
+      </div>
+    </div>
+    <div class="figure-cap">Trade fenêtre ouverte — la banner trade docke dans la frame Pocket.<br>Bonus button <code>whisper + accept</code> envoie le prix puis appelle <code>AcceptTrade()</code>.</div>
+  </div>
+</div>
+
+<!-- =================== 10. POCKET SPEC =================== -->
+<h2 id="pocket-spec"><span class="num">10.</span>Pocket — spec d’implémentation</h2>
+
+<h3>Nouvelles dimensions</h3>
+<table class="kv">
+  <tr><th>FRAME_W</th><td>280 (inchangé)</td></tr>
+  <tr><th>HEADER_H</th><td>22 (inchangé)</td></tr>
+  <tr><th>BANNER_H</th><td>16 — conditionnel (armed, invited, trade open)</td></tr>
+  <tr><th>SLOT_W / SLOT_H</th><td>32 / 32 (augmenté de 22)</td></tr>
+  <tr><th>INPUT_H</th><td>48 — item slot + name + WTS button</td></tr>
+  <tr><th>RULE_H</th><td>3 — paddings autour de la 1 px line</td></tr>
+  <tr><th>AUTO_RULE_H</th><td>22 — phrase éditable</td></tr>
+  <tr><th>LIST_H</th><td>variable — fill</td></tr>
+  <tr><th>OFFER_TOP_H</th><td>28 — #1 offer (gold rail)</td></tr>
+  <tr><th>OFFER_SECOND_H</th><td>22 — #2 offer</td></tr>
+  <tr><th>OFFER_H</th><td>18 — #3+ offers</td></tr>
+  <tr><th>FOOTER_H</th><td>22 (inchangé)</td></tr>
+</table>
+
+<h3>Nouveau comportement Trade Banner</h3>
+<ul>
+  <li><strong>TRADE_SHOW</strong> :
+    <ul>
+      <li>Si <code>state.frame:IsShown()</code> → docker la trade UI dans la frame (remplace le scroll list temporairement). La frame Pocket grandit de +110 px.</li>
+      <li>Sinon → comportement actuel (banner flottante au centre-bas).</li>
+    </ul>
+  </li>
+  <li><strong>TRADE_CLOSED</strong> : retour à l’état précédent (scroll list visible, taille originale).</li>
+  <li><strong>whisper + accept</strong> : <code>SendChatMessage(formatCopperCompact(total), "WHISPER", nil, name)</code> puis <code>AcceptTrade()</code>. C’est la séquence que 95 % des users veulent ; ça vaut un bouton séparé.</li>
+</ul>
+
+<h3>Banner factory partagée</h3>
+<p>L’<code>armed-banner</code> est strictement la même primitive que celle de Shield, juste avec une couleur paramétrée. À implémenter une fois dans <code>Core.lua</code> comme <code>ns.UI.Banner.Create(parent, variant)</code> où <code>variant ∈ {amber, green, red}</code>. Shield + Pocket l’utilisent.</p>
+
+<h3>Tier de prix &mdash; pas de magic dans la sort</h3>
+<p>La hiérarchie #1/#2/#3+ est purement visuelle. La sort reste <code>copper descending</code> comme aujourd’hui. <code>refreshList</code> applique simplement :</p>
+<pre>local heights = { 28, 22, 18, 18, ... }
+local backgrounds = {
+  goldRail,        -- top
+  nil,             -- second
+  nil,             -- rest
+}
+local alphas = { 1.0, 0.85, 0.55 }  -- text alpha decay</pre>
+<p>Toujours pool-based, pas de re-création.</p>
+
+<h3>Item slot agrandi — drag/drop inchangé</h3>
+<p>L’API <code>OnReceiveDrag</code> + <code>OnClick</code> + shift-click reste identique ; seul le <code>SetSize(32, 32)</code> change. Le placeholder « + » est un FontString gold_rim 18 px centré, alpha 0.5.</p>
+
+<!-- =================== 11. MIGRATION =================== -->
+<h2 id="migration"><span class="num">11.</span>Migration &amp; risques</h2>
+
+<h3>Ordre d’implémentation suggéré</h3>
+<ol>
+  <li><strong>Core.lua : helpers partagés</strong>. <code>ns.UI.Banner.Create</code>, <code>ns.UI.Segmented.Create</code>. Pas de breaking change — purement additif.</li>
+  <li><strong>Shield.lua : refonte non-destructive</strong>. La frame existante est démontée et reconstruite avec les nouvelles primitives. Aucun changement de schema <code>db.shield</code>. Aucun changement de slash commands, de keybindings, de comportement de capture/dispatch.</li>
+  <li><strong>Pocket.lua : refonte non-destructive</strong>. Idem. <code>state</code> module-local conserve sa shape ; seul le rendu change. L’ajout du dock-trade est additif (l’ancien comportement flottant est gardé en fallback).</li>
+</ol>
+
+<h3>Risques techniques</h3>
+<table class="kv">
+  <tr><th>Trade dock</th><td>Sur 3.3.5a, la fenêtre Blizzard <code>TradeFrame</code> apparaît à un anchor fixe. Si elle chevauche Pocket-once-docked, le user va devoir bouger Pocket. Risque acceptable — la frame est déjà movable. Tester avec un setup typique (Pocket en bas-droite par défaut).</td></tr>
+  <tr><th>Banner clamp</th><td>L’armed-banner sous le header consomme 16 px. Si Pocket est dragué en haut de l’écran, vérifier que le frame reste <code>ClampedToScreen</code> et que les heights dynamiques (banner conditionnelle) ne provoquent pas un saut visuel quand armée. Mitigation : toujours réserver les 16 px (banner visible mais transparente quand idle).</td></tr>
+  <tr><th>Segmented widget</th><td>5 options à 22 px chacune sur une frame de 260 px = 220 px de largeur disponible (après pads). Si on ajoute un 6e mode plus tard, faire passer à 2 lignes ou troncatuer. Pas de problème immédiat.</td></tr>
+  <tr><th>Section headers</th><td><code>buildDisplayItems</code> doit insérer les items section <em>avant tri</em>, sinon la sort alpha les éparpille. Stocker l’ordre d’apparition dans <code>line.captureOrder</code> et trier par section puis nom dans la section.</td></tr>
+  <tr><th>Banned lookup</th><td>Le check <code>banned[spellId]</code> par row est O(1) si on précalcule un <code>{[id]=true}</code> set à chaque <code>refreshList</code>. Trivial.</td></tr>
+</table>
+
+<h3>Hors-périmètre</h3>
+<ul>
+  <li>Aucun changement au main Warden window ou à WardenSword.</li>
+  <li>Aucun changement aux slash commands ou keybindings.</li>
+  <li>Aucun changement au protocole de whisper bot.</li>
+  <li>Aucune migration de SavedVariables — le schema <code>db.shield</code> reste inchangé.</li>
+</ul>
+
+<div class="foot-sig">
+Document de design préparé pour la refonte UI de WardenShield et WardenPocket — Warden v1.0.0.<br>
+Aligné sur <code>WARDEN_UI.md</code>, <code>WARDEN_SHIELD.md</code>, <code>WARDEN_POCKET.md</code> et le feature brief 2026-04-28.<br>
+Aucun token de couleur, aucun tier de bouton, aucun schema de persistance n’est introduit hors de l’existant <code>Core.lua</code> / <code>Persistence.lua</code>.
+</div>
+
+</main>
+</body>
+</html>

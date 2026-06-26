@@ -363,13 +363,15 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
     end
     smartBtn:SetPoint("TOPLEFT", dangerP.content, "TOPLEFT", 4, dangerY)
     smartBtn:SetScript("OnClick", function(self)
-        if not UnitExists("target") or not UnitIsPlayer("target") then
-            ns.MsgErr("Target a bot first.")
+        -- Target OR mouseover a bot (shared resolver from UI_TabSpec) so you
+        -- don't have to hard-target the unit you want to re-spec.
+        local unit, targetName, classTok = ns.ResolveBotUnit and ns.ResolveBotUnit()
+        if not unit then
+            ns.MsgErr("Target or mouseover a bot first.")
             return
         end
-        local targetName  = UnitName("target")
-        local _, classTok = UnitClass("target")
-        local specs       = SMART_SPECS[classTok or ""]
+        local targetGUID = UnitGUID(unit)
+        local specs      = SMART_SPECS[classTok or ""]
         if not specs then
             ns.MsgWarn("No specs defined for class " .. tostring(classTok) .. ".")
             return
@@ -385,13 +387,10 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
                 e.func = function()
                     SendChatMessage("talents spec " .. s .. " pve", "WHISPER", nil, targetName)
                     ns.MsgInfo(string.format("Sent `talents spec %s pve` to %s.", s, targetName))
-                    if ns.Engine and ns.Engine.state then
-                        local g = UnitGUID("target")
-                        if g then
-                            ns.Engine.state.assignedSpecs[g] = {
-                                name = targetName, spec = s, classToken = classTok,
-                            }
-                        end
+                    if ns.Engine and ns.Engine.state and targetGUID then
+                        ns.Engine.state.assignedSpecs[targetGUID] = {
+                            name = targetName, spec = s, classToken = classTok,
+                        }
                     end
                 end
                 UIDropDownMenu_AddButton(e)

@@ -16,6 +16,23 @@ local _, ns = ...
 ns.UI.Tabs      = ns.UI.Tabs      or {}
 ns.UI.Tabs.Spec = ns.UI.Tabs.Spec or {}
 
+-- Resolve the bot to act on without forcing a hard target: prefer the hard
+-- target if it's another player (bot), else fall back to the mouseover unit.
+-- Returns unit, name, classToken - or nil if neither is a valid bot. Lets the
+-- spec tiles / Smart ReSpec work by hovering a raid frame too, not only by
+-- click-targeting (closes the "requires a live target" gap).
+local function resolveBotUnit()
+    local cands = { "target", "mouseover" }
+    for _, u in ipairs(cands) do
+        if UnitExists(u) and UnitIsPlayer(u) and not UnitIsUnit(u, "player") then
+            local _, classTok = UnitClass(u)
+            return u, UnitName(u), classTok
+        end
+    end
+    return nil
+end
+ns.ResolveBotUnit = resolveBotUnit  -- shared with UI_TabControls (Smart ReSpec)
+
 -- ----------------------------------------------------------
 -- Spec subtitle hints: "pve - burst" style categorization
 -- ----------------------------------------------------------
@@ -274,15 +291,15 @@ local function rebuildTilesFor(classToken)
         end
 
         tile:SetScript("OnClick", function()
-            if not (UnitExists("target") and UnitIsPlayer("target")) then
-                ns.MsgErr("Target a player first.")
+            -- Target OR mouseover a bot - no hard target required.
+            local unit, targetName, curClass = resolveBotUnit()
+            if not unit then
+                ns.MsgErr("Target or mouseover a bot first.")
                 return
             end
-            local targetName  = UnitName("target")
-            local targetGUID  = UnitGUID("target")
-            local _, curClass = UnitClass("target")
+            local targetGUID = UnitGUID(unit)
             if curClass ~= classToken then
-                ns.MsgWarn("Target changed class - retarget and try again.")
+                ns.MsgWarn("That bot isn't a " .. classToken .. " - pick the matching class's tile.")
                 return
             end
 
@@ -292,7 +309,7 @@ local function rebuildTilesFor(classToken)
                 ns.MsgWarn("No execution defined for " .. classToken .. " - " .. specName)
                 return
             end
-            fn()
+            fn(targetName)  -- pass resolved name so mouseover works, not just hard target
 
             if targetGUID and ns.Engine and ns.Engine.state and ns.Engine.state.assignedSpecs then
                 local prev = ns.Engine.state.assignedSpecs[targetGUID] or {}
@@ -626,6 +643,62 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     autogearBtn:SetScript("OnClick", function()
         SendChatMessage("autogear", "PARTY")
         ns.MsgInfo("Broadcast `autogear` to PARTY.")
+    end)
+
+    -- ============================================================
+    -- Bot init ("level up"): (re)spec EVERY bot to a gear-quality tier
+    -- via `.warstormbot bot init=<rarity>`. The rarity dropdown picks the
+    -- tier; the button fires the command on the bot command channel
+    -- (db.commandChannel, SAY by default) - same channel the class-summon
+    -- buttons use in the Controls tab. Sits in the top-right of the Target
+    -- card since it's a global bot action, not target-specific.
+    -- ============================================================
+    local RARITIES = { "common", "uncommon", "rare", "epic" }
+    local RARITY_LABEL = {
+        common = "Common", uncommon = "Uncommon", rare = "Rare", epic = "Epic",
+    }
+    -- WoW item-quality colors so the picked tier reads at a glance.
+    local RARITY_COLOR = {
+        common   = "ffffffff", -- white
+        uncommon = "ff1eff00", -- green
+        rare     = "ff0070dd", -- blue
+        epic     = "ffa335ee", -- purple
+    }
+    local function rarityText(r)
+        return "|c" .. (RARITY_COLOR[r] or "ffffffff") .. (RARITY_LABEL[r] or r) .. "|r"
+    end
+    tabState.botInitRarity = tabState.botInitRarity or "epic"
+
+    local biLbl = cardPanel.content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    biLbl:SetPoint("TOPRIGHT", cardPanel.content, "TOPRIGHT", -8, -2)
+    biLbl:SetText("BOT INIT")
+    biLbl:SetTextColor(0.72, 0.58, 0.21, 1)
+
+    local rarityDrop = CreateFrame("Frame", "WardenSpecRarityDrop", cardPanel.content, "UIDropDownMenuTemplate")
+    rarityDrop:SetPoint("TOPRIGHT", biLbl, "BOTTOMRIGHT", 14, -2)
+    ns.UI.Dropdown.style(rarityDrop, 90)
+    UIDropDownMenu_Initialize(rarityDrop, function()
+        for _, r in ipairs(RARITIES) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text  = rarityText(r)
+            info.value = r
+            info.func  = function(self)
+                tabState.botInitRarity = self.value
+                UIDropDownMenu_SetText(rarityDrop, rarityText(self.value))
+            end
+            UIDropDownMenu_AddButton(info)
+        end
+    end)
+    UIDropDownMenu_SetText(rarityDrop, rarityText(tabState.botInitRarity))
+
+    local levelBtn = ns.UI.Button.gold(cardPanel.content, "level up", 90, 20)
+    levelBtn:SetPoint("TOPRIGHT", rarityDrop, "BOTTOMRIGHT", -16, 0)
+    levelBtn:SetScript("OnClick", function()
+        local db     = ns.Persistence and ns.Persistence.DB
+        local chan   = (db and db.commandChannel) or "SAY"
+        local rarity = tabState.botInitRarity or "epic"
+        SendChatMessage(".warstormbot bot init=" .. rarity, chan)
+        ns.MsgInfo(string.format("Sent `.warstormbot bot init=%s` (%s).", rarity, chan))
     end)
 
     -- ============================================================

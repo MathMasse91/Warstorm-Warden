@@ -2,7 +2,7 @@
   WARDEN - Raid Commander for WoW 3.3.5a (WotLK) / WarStorm
 ================================================================
 
-Version : 1.1.0
+Version : 1.0.0
 Target  : World of Warcraft 3.3.5a (WotLK private server)
 Server  : WarStorm (mod-playerbots enabled)
 Author  : UnrealTruth

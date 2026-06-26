@@ -61,12 +61,16 @@ ns.Data.DEFAULT_SPEC_PVE = {
 -- Called from UI_Main spec buttons. Special-case: "da blood pve" expands
 -- to "double aura blood pve" for the server bot command.
 -- ----------------------------------------------------------
-local function whisperSpec(specServerName)
-    SendChatMessage("talents spec " .. specServerName, "WHISPER", nil, UnitName("target"))
+-- targetName is optional: callers that resolved a unit themselves (e.g. a
+-- mouseover-or-target bot) pass the name explicitly; legacy callers pass
+-- nothing and we fall back to the hard target, preserving old behavior.
+local function whisperSpec(specServerName, targetName)
+    SendChatMessage("talents spec " .. specServerName, "WHISPER", nil,
+        targetName or UnitName("target"))
 end
 
 local function mkSpec(serverName)
-    return function() whisperSpec(serverName) end
+    return function(targetName) whisperSpec(serverName, targetName) end
 end
 
 ns.Data.SPEC_EXEC = {
