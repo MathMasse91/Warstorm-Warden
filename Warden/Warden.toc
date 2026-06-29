@@ -18,6 +18,7 @@ WardenSword_Actions.lua
 WardenSword.lua
 Shield.lua
 Pocket.lua
+WardenMantle.lua
 UI_Master.lua
 UI_TabSpec.lua
 UI_TabControls.lua

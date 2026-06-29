@@ -102,6 +102,16 @@
         </Binding>
 
         <!-- ================================================== -->
+        <!-- WardenMantle (spec-swap HUD) bindings              -->
+        <!-- ================================================== -->
+        <Binding name="WARDENMANTLE_TOGGLE" header="WARDENMANTLE">
+            if WARDENMANTLE_Toggle then WARDENMANTLE_Toggle() end
+        </Binding>
+        <Binding name="WARDENMANTLE_LOCK">
+            if WARDENMANTLE_ToggleLock then WARDENMANTLE_ToggleLock() end
+        </Binding>
+
+        <!-- ================================================== -->
         <!-- WardenShield (discovery / capture HUD) bindings    -->
         <!-- ================================================== -->
         <Binding name="WARDENSHIELD_TOGGLE" header="WARDENSHIELD">

@@ -64,9 +64,20 @@ ns.Data.DEFAULT_SPEC_PVE = {
 -- targetName is optional: callers that resolved a unit themselves (e.g. a
 -- mouseover-or-target bot) pass the name explicitly; legacy callers pass
 -- nothing and we fall back to the hard target, preserving old behavior.
+-- Route through ns.Engine.Queue so the spec whisper drains on the same
+-- throttle as bot-add commands. This fixes the old direct-SendChatMessage
+-- bypass (which could trip the server "10 whispers / 10s" mute on a rapid
+-- Re-Spec) and lets WardenMantle reuse SPEC_EXEC for mute-safe spec swaps.
+-- ns.Engine resolves at call time (post-login), so Data-before-Engine load
+-- order is fine.
 local function whisperSpec(specServerName, targetName)
-    SendChatMessage("talents spec " .. specServerName, "WHISPER", nil,
-        targetName or UnitName("target"))
+    local target = targetName or UnitName("target")
+    if not target then return end
+    if ns.Engine and ns.Engine.Queue then
+        ns.Engine.Queue("talents spec " .. specServerName, "WHISPER", target)
+    else
+        SendChatMessage("talents spec " .. specServerName, "WHISPER", nil, target)
+    end
 end
 
 local function mkSpec(serverName)
@@ -205,10 +216,10 @@ ns.Data.TOTEM_TOOLTIPS = {
 -- Shaman uses opt1 for totem sets (not a strategy code).
 function ns.Data.GetOptionsForClassSpec(classToken, spec)
     if classToken == "PALADIN" then
-        local opt1 = { "kings", "might", "wisdom" }
-        if spec and string.find(spec, "prot", 1, true) then
-            table.insert(opt1, "sanctuary")
-        end
+        -- Sanctuary is offered for every paladin spec (not just prot) so it can
+        -- always be picked from the slot's buff list; in-client only a prot
+        -- paladin will actually cast it, but the option must be selectable.
+        local opt1 = { "kings", "might", "wisdom", "sanctuary" }
         local opt2 = { "devotion", "retribution", "concentration", "crusader",
                        "fire res", "frost res", "shadow res" }
         return opt1, opt2, false
@@ -618,3 +629,74 @@ ns.Data.CLASS_ICON = {
     PALADIN     = { 0,    0.25, 0.5,  0.75 },
     DEATHKNIGHT = { 0.25, 0.5,  0.5,  0.75 },
 }
+
+-- ----------------------------------------------------------
+-- WardenMantle support: spec icon paths + small inline helpers.
+-- SPEC_ICONS is keyed class -> base-spec -> icon path. The base spec is the
+-- spec string with the trailing pve/pvp mode stripped (see SpecSplit), so a
+-- single icon serves both the PvE and PvP row. A nil lookup tells the caller
+-- to draw a class-colored fallback tile with the SpecLabel code.
+-- (3.3.5a icon paths - verify / swap in-client.)
+-- ----------------------------------------------------------
+ns.Data.SPEC_ICONS = {
+    WARRIOR = { prot="Interface\\Icons\\Ability_Warrior_DefensiveStance", arms="Interface\\Icons\\Ability_Warrior_SavageBlow", fury="Interface\\Icons\\Ability_Warrior_InnerRage" },
+    PALADIN = { prot="Interface\\Icons\\Spell_Holy_DevotionAura", ret="Interface\\Icons\\Spell_Holy_AuraOfLight", holy="Interface\\Icons\\Spell_Holy_HolyBolt" },
+    HUNTER  = { bm="Interface\\Icons\\Ability_Hunter_BeastTaming", mm="Interface\\Icons\\Ability_Hunter_FocusedAim", surv="Interface\\Icons\\Ability_Hunter_SwiftStrike" },
+    ROGUE   = { as="Interface\\Icons\\Ability_Rogue_Eviscerate", combat="Interface\\Icons\\Ability_BackStab", subtlety="Interface\\Icons\\Ability_Stealth" },
+    PRIEST  = { holy="Interface\\Icons\\Spell_Holy_GuardianSpirit", disc="Interface\\Icons\\Spell_Holy_PowerWordShield", shadow="Interface\\Icons\\Spell_Shadow_ShadowWordPain" },
+    SHAMAN  = { resto="Interface\\Icons\\Spell_Nature_MagicImmunity", ele="Interface\\Icons\\Spell_Nature_Lightning", enh="Interface\\Icons\\Spell_Nature_LightningShield" },
+    MAGE    = { arcane="Interface\\Icons\\Spell_Holy_MagicalSentry", frost="Interface\\Icons\\Spell_Frost_FrostBolt02", fire="Interface\\Icons\\Spell_Fire_FlameBolt", frostfire="Interface\\Icons\\Ability_Mage_Frostfirebolt" },
+    WARLOCK = { affli="Interface\\Icons\\Spell_Shadow_DeathCoil", demo="Interface\\Icons\\Spell_Shadow_Metamorphosis", destro="Interface\\Icons\\Spell_Shadow_RainOfFire" },
+    DRUID   = { bear="Interface\\Icons\\Ability_Racial_BearForm", resto="Interface\\Icons\\Spell_Nature_HealingTouch", cat="Interface\\Icons\\Ability_Druid_CatForm", balance="Interface\\Icons\\Spell_Nature_StarFall" },
+    DEATHKNIGHT = { blood="Interface\\Icons\\Spell_Deathknight_BloodPresence", frost="Interface\\Icons\\Spell_Deathknight_FrostPresence", unholy="Interface\\Icons\\Spell_Deathknight_UnholyPresence", ["da blood"]="Interface\\Icons\\Spell_Deathknight_BloodPresence" },
+}
+
+-- Split a spec string into (base, mode) on the LAST space, so multi-word
+-- bases survive: "da blood pve" -> "da blood","pve"; "prot pve" -> "prot","pve".
+-- Returns (s, nil) when there is no space.
+function ns.Data.SpecSplit(s)
+    if type(s) ~= "string" then return s, nil end
+    local base, mode = s:match("^(.*)%s(%S+)$")
+    if base then return base, mode end
+    return s, nil
+end
+
+-- Bucket a class's CLASS_SPECS into ordered PvE / PvP rows for the Mantle HUD.
+-- Each entry carries the full spec string (for SPEC_EXEC lookup) plus its
+-- base + mode. Returns nil for an unknown class.
+function ns.Data.MantleRows(classToken)
+    local specs = ns.Data.CLASS_SPECS[classToken]
+    if not specs then return nil end
+    local out = { pve = {}, pvp = {} }
+    for _, spec in ipairs(specs) do
+        local base, mode = ns.Data.SpecSplit(spec)
+        local bucket = out[mode]
+        if bucket then
+            table.insert(bucket, { spec = spec, base = base, mode = mode })
+        end
+    end
+    return out
+end
+
+-- Short upper-case code for a fallback (icon-less) tile. Single word -> first
+-- three letters; multi-word -> the initials. "prot"->"PRO", "da blood"->"DAB".
+function ns.Data.SpecLabel(base)
+    if type(base) ~= "string" or base == "" then return "?" end
+    if base:find("%s") then
+        local out = ""
+        for word in base:gmatch("%S+") do
+            out = out .. word:sub(1, 1):upper()
+        end
+        return out
+    end
+    return base:sub(1, 3):upper()
+end
+
+-- Display caption for a tile: capitalize each word. "prot"->"Prot",
+-- "da blood"->"Da Blood".
+function ns.Data.SpecCaption(base)
+    if type(base) ~= "string" or base == "" then return "" end
+    return (base:gsub("(%S)(%S*)", function(first, rest)
+        return first:upper() .. rest
+    end))
+end

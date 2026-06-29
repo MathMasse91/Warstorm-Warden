@@ -67,8 +67,9 @@ That's how **Warden v1.0.0** happened. 👍
 
 - Visual raid grid (5 / 10 / 25 / 40)
 - Drag & drop setup
-- Per slot: spec / blessings / totems / auras / resist
-- Live buff coverage (see what's missing instantly)
+- Per slot: spec / blessings / totems / auras / resist (paladins can pick **Sanctuary** on any spec)
+- **Coverage panel** — a raid-grid table of buff tiles that light green when provided and stay dim-red when missing, so gaps read at a glance
+- Consolidated **action bar** along the bottom: FILE row (save / load / import / export / delete / clear / cleanup / rename) up top, and the **Build · Create · Stop Build** group with the live Queue/Pending status below
 - `[P]` flag = real player (never touched)
 
 **Roster**
@@ -127,6 +128,19 @@ A hands-off **WTS auction** tool that sells to bot buyers for you.
 - Tunable: `Top` (max offers) and `Wait` (timeout seconds)
 - Trade banner: set quantity → it whispers the exact total to the winner
 - `[Stop]` freezes bidding, `[Clear]` resets and un-invites
+
+### 🎽 WardenMantle — `/wm`
+
+A small floating **bot-management HUD** for whatever you're targeting.
+
+- **Target line** — portrait + class-colored name + level of the current target (or "No Target")
+- **Summon** — summon the targeted bot to you
+- **Autogear** — run the bot's autogear pass
+- **BOT INIT** — pick a gear rarity (Common / Uncommon / Rare / Epic) then hit **ResetBot** to send `.warstormbot bot init=<rarity>`, re-rolling the bot's gear at that quality
+- Draggable / lockable, position persists across `/reload`
+- Every command funnels through the same throttled Engine queue as the rest of Warden (no chat-flood mutes)
+
+> Replaces the old spec-swap card: spec switching lives on the **Spec** tab, so WardenMantle is now purely about summoning, gearing, and resetting bots.
 
 ### 📋 Presets
 
@@ -212,6 +226,16 @@ Direct HUD actions: `/ws summon · follow · stay · flee · aoe · burn · skul
 | `/wp ItemName`   | Toggle + pre-fill the item name field |
 | `/wardenpocket`  | Alias for `/wp`                       |
 
+**WardenMantle**
+
+| Command          | What it does                       |
+|------------------|------------------------------------|
+| `/wm`            | Toggle the WardenMantle HUD        |
+| `/wm show \| hide` | Explicit show / hide             |
+| `/wm lock \| unlock` | Lock or unlock position         |
+| `/wm reset`      | Reset position                     |
+| `/wm help`       | Print the command list             |
+
 **Logging**
 
 | Command              | What it does                         |
@@ -224,7 +248,7 @@ Direct HUD actions: `/ws summon · follow · stay · flee · aoe · burn · skul
 
 ## ⌨️ Keybinds
 
-Bindable under **ESC → Key Bindings → "Warden"**: toggle window, tab shortcuts, Summon / Follow / Stay / Tank-Attack / Flee, plus the full **WardenSword** action and role-command set (AoE, Burn CDs, Skull, BL, Tanks/Healers/DPS Attack/Stay). Every binding routes through the same throttled Engine queue, so hammering a hotkey never triggers a server-side mute.
+Bindable under **ESC → Key Bindings → "Warden"**: toggle window, tab shortcuts, Summon / Follow / Stay / Tank-Attack / Flee, plus the full **WardenSword** action and role-command set (AoE, Burn CDs, Skull, BL, Tanks/Healers/DPS Attack/Stay), and **WardenMantle** toggle / lock. Every binding routes through the same throttled Engine queue, so hammering a hotkey never triggers a server-side mute.
 
 ## 🖱️ Minimap button
 

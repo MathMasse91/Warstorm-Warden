@@ -129,7 +129,7 @@ local state = {
     slots      = {},
     selected   = nil,
     nameBox    = nil,
-    sizeDrop   = nil,
+    sizeSeg    = nil,
     presetDrop = nil,
     gridPanel  = nil,
     gridInner  = nil,
@@ -990,9 +990,7 @@ loadFromRows = function(rows, size)
         else newSize = 40 end
     end
     applySizeLayout(newSize)
-    if state.sizeDrop then
-        UIDropDownMenu_SetText(state.sizeDrop, "size: " .. newSize .. " ")
-    end
+    if state.sizeSeg then state.sizeSeg:SetActive(state.size) end
     for _, r in ipairs(rows) do
         local count = tonumber(r.count) or 1
         for _ = 1, count do
@@ -1015,9 +1013,7 @@ loadFromSlotsByIdx = function(byIdx, size)
     wipe(state.slots)
     if type(byIdx) ~= "table" then return end
     applySizeLayout(size or 25)
-    if state.sizeDrop then
-        UIDropDownMenu_SetText(state.sizeDrop, "size: " .. state.size .. " ")
-    end
+    if state.sizeSeg then state.sizeSeg:SetActive(state.size) end
     for i = 1, state.size do
         local r = byIdx[i]
         if r then
@@ -1306,40 +1302,84 @@ end
 -- ----------------------------------------------------------
 -- Sidebar - coverage pills (blessings - totems - resists)
 -- ----------------------------------------------------------
+-- v1.1: the 15 mock coverage chips in mock order, as a single flat group
+-- (the "COVERAGE" header already labels the section). Each key is a logical
+-- flag set by scanCoverageMap from the providers already present in the comp.
 local COV_GROUPS = {
-    { title = "BLESSINGS / SHOUTS", items = {
-        { label = "Kings",   key = "PALADIN|kings"    },
-        { label = "Might",   key = "PALADIN|might"    },
-        { label = "Wisdom",  key = "PALADIN|wisdom"   },
-        { label = "Sanct",   key = "PALADIN|sanctuary" },
-        { label = "BS",      key = "WARRIOR|bshout"   },
-    }},
-    { title = "TOTEMS", items = {
-        { label = "Melee",  key = "SHAMAN|melee"  },
-        { label = "Caster", key = "SHAMAN|caster" },
-        { label = "Tank",   key = "SHAMAN|tank"   },
-    }},
-    { title = "RESISTS", items = {
-        { label = "Frost",  key = "PALADIN|frost res"  },
-        { label = "Fire",   key = "PALADIN|fire res"   },
-        { label = "Shadow", key = "PRIEST|shadow res"  },
-        { label = "Nature", key = "HUNTER|aotw"        },
+    { title = nil, items = {
+        { label = "Kings",    key = "kings"    },
+        { label = "Might",    key = "might"    },
+        { label = "Wisdom",   key = "wisdom"   },
+        { label = "Sanct.",   key = "sanct"    },
+        { label = "Devot.",   key = "devot"    },
+        { label = "Retrib.",  key = "retrib"   },
+        { label = "B.Shout",  key = "bshout"   },
+        { label = "Command",  key = "command"  },
+        { label = "MoW",      key = "mow"      },
+        { label = "Windf.",   key = "windf"    },
+        { label = "ManaSpr",  key = "manaspr"  },
+        { label = "AotW",     key = "aotw"     },
+        { label = "ShadRes",  key = "shadres"  },
+        { label = "FireRes",  key = "fireres"  },
+        { label = "FrostRes", key = "frostres" },
     }},
 }
 
+-- Build the coverage flag set from the current comp. Each provider maps to one
+-- or more of the 15 mock chips (see WARDEN_1.1_PLAN.md workstream C3).
 local function scanCoverageMap()
-    local map = {}
+    local f = {}
     for _, slot in ipairs(state.slots) do
         if slot and slot.classToken then
-            for k in pairs(splitSet(slot.opt1)) do
-                map[slot.classToken .. "|" .. k] = true
-            end
-            for k in pairs(splitSet(slot.opt2)) do
-                map[slot.classToken .. "|" .. k] = true
+            local cls  = slot.classToken
+            local o1   = splitSet(slot.opt1)
+            local o2   = splitSet(slot.opt2)
+            local spec = slot.spec or ""
+            if cls == "PALADIN" then
+                if o1.kings        then f.kings    = true end
+                if o1.might        then f.might    = true end
+                if o1.wisdom       then f.wisdom   = true end
+                if o1.sanctuary    then f.sanct    = true end
+                if o2.devotion     then f.devot    = true end
+                if o2.retribution  then f.retrib   = true end
+                if o2["fire res"]  then f.fireres  = true end
+                if o2["frost res"] then f.frostres = true end
+            elseif cls == "WARRIOR" then
+                if o1.battle       then f.bshout   = true end
+                if o1.commanding   then f.command  = true end
+            elseif cls == "DRUID" then
+                f.mow = true  -- Mark of the Wild: any Druid presence
+            elseif cls == "SHAMAN" then
+                -- Shaman opt1 is a totem set; enh spec also brings windfury.
+                if o1.melee                       then f.windf    = true end
+                if spec:find("enh", 1, true)      then f.windf    = true end
+                if o1.caster or o1.healing        then f.manaspr  = true end
+                if o1["fire res"]                 then f.fireres  = true end
+                if o1["frost res"]                then f.frostres = true end
+            elseif cls == "HUNTER" then
+                if o1.aotw         then f.aotw     = true end
+            elseif cls == "PRIEST" then
+                if o2["shadow res"] then f.shadres = true end
             end
         end
     end
-    return map
+    return f
+end
+
+-- Cell color sets for the raid-grid coverage panel. A provided buff lights
+-- its tile green (like a healthy raid-frame cell); a missing buff stays a
+-- dim red-brown tile. Carrying state in the tile fill + rim (not glyphs) is
+-- what makes the panel scan like the raid grid at a glance.
+local COV_OK_BG,   COV_OK_RIM,   COV_OK_TXT   = {0.10, 0.26, 0.09}, {0.20, 0.78, 0.27}, {0.74, 1.00, 0.66}
+local COV_MISS_BG, COV_MISS_RIM, COV_MISS_TXT = {0.14, 0.07, 0.06}, {0.42, 0.22, 0.18}, {0.60, 0.42, 0.38}
+
+local function paintCovCell(cell, ok)
+    local bg  = ok and COV_OK_BG  or COV_MISS_BG
+    local rim = ok and COV_OK_RIM or COV_MISS_RIM
+    local txt = ok and COV_OK_TXT or COV_MISS_TXT
+    cell.frame:SetBackdropColor(bg[1], bg[2], bg[3], 0.92)
+    cell.frame:SetBackdropBorderColor(rim[1], rim[2], rim[3], 1)
+    cell.label:SetTextColor(txt[1], txt[2], txt[3], 1)
 end
 
 refreshCoverage = function()
@@ -1347,24 +1387,12 @@ refreshCoverage = function()
     if not c then return end
     local map = scanCoverageMap()
     local gi = 1
-    -- P1 review asked for visible ok/warn glyphs instead of "ok"/"!" text so
-    -- coverage is scannable at a glance. 3.3.5a's default font can't render
-    -- Unicode checkmarks, so we stick with ASCII `[+]` (ok, green) and
-    -- `[!]` (missing, amber) - but color the whole pill label + prefix so
-    -- the state is obvious from 6 feet away.
     for _, g in ipairs(COV_GROUPS) do
         local gr = c.groups[gi]; gi = gi + 1
         if gr then
             for i, item in ipairs(g.items) do
-                local pill = gr.pills[i]
-                if pill then
-                    local ok = map[item.key]
-                    if ok then
-                        pill:SetText(string.format("|cff2ecc40[+] %s|r", item.label))
-                    else
-                        pill:SetText(string.format("|cffff9a00[!] %s|r", item.label))
-                    end
-                end
+                local cell = gr.cells[i]
+                if cell then paintCovCell(cell, map[item.key] and true or false) end
             end
         end
     end
@@ -1403,6 +1431,22 @@ end
 -- ----------------------------------------------------------
 -- Preset dropdown
 -- ----------------------------------------------------------
+-- Is the current grid non-empty? Used to gate the load-confirm popup.
+local function compHasSlots()
+    for _, s in ipairs(state.slots) do if s then return true end end
+    return false
+end
+
+-- Confirm before an instance preset replaces a non-empty comp. The actual
+-- load closure is passed as `data` and fired on accept. Empty comps skip this
+-- and load directly (see the dropdown entry below).
+StaticPopupDialogs["WARDEN_COMP_LOAD_CONFIRM"] = {
+    text         = "Replace the current comp with \"%s\"?\nUnsaved slots will be lost.",
+    button1      = YES, button2 = NO, timeout = 0,
+    whileDead    = true, hideOnEscape = true,
+    OnAccept     = function(_, data) if data then data() end end,
+}
+
 local function refreshPresetDropdown()
     if not state.presetDrop then return end
     UIDropDownMenu_Initialize(state.presetDrop, function()
@@ -1415,14 +1459,23 @@ local function refreshPresetDropdown()
             local info = UIDropDownMenu_CreateInfo()
             info.text, info.value = name, name
             info.func = function()
-                loadComp(comp)
-                if state.nameBox then state.nameBox:SetText(name) end
-                if markSaved and ns.Persistence.DB then
-                    ns.Persistence.DB.lastComp = name
+                local function doLoad()
+                    loadComp(comp)
+                    if state.nameBox then state.nameBox:SetText(name) end
+                    if markSaved and ns.Persistence.DB then
+                        ns.Persistence.DB.lastComp = name
+                    end
+                    UIDropDownMenu_SetText(state.presetDrop, "presets ")
+                    state.selected = nil
+                    refreshAll()
                 end
-                UIDropDownMenu_SetText(state.presetDrop, "presets ")
-                state.selected = nil
-                refreshAll()
+                -- Confirm only when the current comp is non-empty; empty loads
+                -- replace nothing, so they go straight through.
+                if compHasSlots() then
+                    StaticPopup_Show("WARDEN_COMP_LOAD_CONFIRM", name, nil, doLoad)
+                else
+                    doLoad()
+                end
             end
             UIDropDownMenu_AddButton(info)
         end
@@ -1476,23 +1529,21 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     ns.UI.Dropdown.style(presetDrop, 110)
     state.presetDrop = presetDrop
 
-    local sizeDrop = CreateFrame("Frame", "WardenCompSizeDrop", pane, "UIDropDownMenuTemplate")
-    sizeDrop:SetPoint("LEFT", presetDrop, "RIGHT", -8, 0)
-    ns.UI.Dropdown.style(sizeDrop, 90)
-    UIDropDownMenu_Initialize(sizeDrop, function()
-        for _, n in ipairs({ 5, 10, 25, 40 }) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text, info.value = "size: " .. n, n
-            info.func = function(self)
-                applySizeLayout(self.value)
-                UIDropDownMenu_SetText(sizeDrop, "size: " .. self.value .. " ")
-                refreshAll()
-            end
-            UIDropDownMenu_AddButton(info)
-        end
+    -- Segmented 5 / 10 / 25 / 40 strip (replaces the old size dropdown).
+    -- Active = stone-tile fill + gold rim + gold text; inactive = gold_dim.
+    local sizeSeg = ns.UI.Segmented.Create(pane, {
+        { key = 5,  label = "5"  },
+        { key = 10, label = "10" },
+        { key = 25, label = "25" },
+        { key = 40, label = "40" },
+    }, function(key)
+        applySizeLayout(key)
+        refreshAll()
     end)
-    UIDropDownMenu_SetText(sizeDrop, "size: " .. state.size .. " ")
-    state.sizeDrop = sizeDrop
+    sizeSeg:SetSize(132, 22)
+    sizeSeg:SetPoint("LEFT", presetDrop, "RIGHT", 4, 4)
+    sizeSeg:SetActive(state.size)
+    state.sizeSeg = sizeSeg
 
     -- Table view removed per user request - grid is the only view.
 
@@ -1592,49 +1643,77 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     detailContent:SetPoint("BOTTOMRIGHT", detailHost, "BOTTOMRIGHT",  0,   0)
     state.sidebar.detail = buildSlotDetail(detailContent)
 
-    -- --- Section 2: Coverage ---
-    local covHost = CreateFrame("Frame", nil, sideChild)
-    covHost:SetPoint("TOPLEFT",  detailHost, "BOTTOMLEFT",  0, -6)
-    covHost:SetPoint("TOPRIGHT", detailHost, "BOTTOMRIGHT", 0, -6)
+    -- --- Section 2: Coverage (FIXED - pinned to the sidebar bottom stack,
+    -- not inside the scroll, so it stays visible while Slot Detail scrolls).
+    -- Anchored at the end of BuildInto once the whole fixed stack exists.
+    -- v1.2 (raid-grid pass): COVERAGE is its own bordered square holding a
+    -- grid of buff tiles - like the raid grid, each cell lights green when the
+    -- comp provides that buff and stays a dim red-brown when it's missing.
+    -- Reads at a glance; refreshCoverage repaints the tiles (see paintCovCell).
+    local covHost = CreateFrame("Frame", nil, sidePanel.content)
+    covHost:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    covHost:SetBackdropColor(0.10, 0.08, 0.05, 0.85)
+    covHost:SetBackdropBorderColor(0.72, 0.58, 0.21, 0.55) -- gold-dim rim = "its own square"
 
     local covHeader = covHost:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    covHeader:SetPoint("TOPLEFT", covHost, "TOPLEFT", 0, -2)
+    covHeader:SetPoint("TOPLEFT", covHost, "TOPLEFT", 8, -5)
     covHeader:SetText("COVERAGE")
     covHeader:SetTextColor(1, 0.82, 0)
 
+    local covRule = covHost:CreateTexture(nil, "ARTWORK")
+    covRule:SetTexture("Interface\\Buttons\\WHITE8x8")
+    covRule:SetVertexColor(0.72, 0.58, 0.21, 0.35)
+    covRule:SetHeight(1)
+    covRule:SetPoint("TOPLEFT", covHeader, "BOTTOMLEFT", 0, -3)
+    covRule:SetPoint("RIGHT",   covHost,   "RIGHT",     -8, 0)
+
     do
         local c = { groups = {} }
-        local y = -20
-        for _, g in ipairs(COV_GROUPS) do
-            local gr = { pills = {} }
-            local lbl = covHost:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-            lbl:SetPoint("TOPLEFT", covHost, "TOPLEFT", 0, y)
-            lbl:SetText(g.title)
-            lbl:SetTextColor(0.72, 0.58, 0.21, 1)
-            y = y - 12
-
-            local x, rowH = 0, 12
-            for i, item in ipairs(g.items) do
-                local p = covHost:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-                p:SetPoint("TOPLEFT", covHost, "TOPLEFT", x, y)
-                p:SetText(string.format("|cffff9a00! %s|r", item.label))
-                gr.pills[i] = p
-                local w = p:GetStringWidth() + 10
-                x = x + math.max(w, 48)
-                if x > sidebarW - 40 then x = 0; y = y - rowH end
-            end
-            y = y - rowH - 4
-            table.insert(c.groups, gr)
+        local items = COV_GROUPS[1].items
+        local gr = { cells = {} }
+        local COLS    = 3
+        local cellH   = 17
+        local gap     = 3
+        local pad     = 6
+        local contentW = sidebarW - 2 * pad - 12  -- minus rim + scrollbar room
+        local colW = math.floor((contentW - (COLS - 1) * gap) / COLS)
+        local topY = -22                          -- below header + rule
+        for i, item in ipairs(items) do
+            local col = (i - 1) % COLS
+            local row = math.floor((i - 1) / COLS)
+            local cell = CreateFrame("Frame", nil, covHost)
+            cell:SetSize(colW, cellH)
+            cell:SetPoint("TOPLEFT", covHost, "TOPLEFT",
+                pad + col * (colW + gap),
+                topY - row * (cellH + gap))
+            cell:SetBackdrop({
+                bgFile   = "Interface\\Buttons\\WHITE8x8",
+                edgeFile = "Interface\\Buttons\\WHITE8x8",
+                edgeSize = 1,
+            })
+            local lbl = cell:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            lbl:SetPoint("CENTER", cell, "CENTER", 0, 0)
+            lbl:SetText(item.label)
+            local rec = { frame = cell, label = lbl }
+            paintCovCell(rec, false) -- seed missing; refreshCoverage repaints
+            gr.cells[i] = rec
         end
-        covHost:SetHeight(-y + 6)
+        local rows = math.ceil(#items / COLS)
+        covHost:SetHeight(22 + rows * (cellH + gap) + pad)
+        table.insert(c.groups, gr)
         state.sidebar.coverage = c
     end
 
-    -- --- Section 3: Summary (just the filled counter + Build) ---
-    local sumHost = CreateFrame("Frame", nil, sideChild)
-    sumHost:SetPoint("TOPLEFT",  covHost, "BOTTOMLEFT",  0, -8)
-    sumHost:SetPoint("TOPRIGHT", covHost, "BOTTOMRIGHT", 0, -8)
-    sumHost:SetHeight(42)
+    -- --- Section 3: Summary (FIXED - filled counter, pinned below coverage in
+    -- the bottom stack). The Build button moved down to the bottom action row
+    -- (with Create / Stop Build) so all the primary actions sit together;
+    -- this section is now just the filled N/M readout.
+    local sumHost = CreateFrame("Frame", nil, sidePanel.content)
+    sumHost:SetHeight(26)
 
     local numLbl = sumHost:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     numLbl:SetPoint("LEFT", sumHost, "LEFT", 2, 0)
@@ -1645,22 +1724,6 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     filledCap:SetPoint("LEFT", numLbl, "RIGHT", 6, 0)
     filledCap:SetText("filled")
     filledCap:SetTextColor(0.61, 0.55, 0.40)
-
-    local buildBtn = ns.UI.Button.red(sumHost, "Build", 96, 28)
-    buildBtn:SetPoint("RIGHT", sumHost, "RIGHT", -2, 0)
-    local buildFS = buildBtn:GetFontString()
-    if buildFS then
-        buildFS:SetFont("Fonts\\FRIZQT__.TTF", 15, "OUTLINE")
-        buildFS:SetTextColor(1.00, 0.92, 0.75)
-    end
-
-    -- TASKS.md §2.5: subtle inner shadow on Build for emphasis.
-    local buildShadow = buildBtn:CreateTexture(nil, "OVERLAY")
-    buildShadow:SetTexture("Interface\\Buttons\\WHITE8x8")
-    buildShadow:SetVertexColor(0, 0, 0, 0.25)
-    buildShadow:SetPoint("TOPLEFT",     buildBtn, "TOPLEFT",      1,  -1)
-    buildShadow:SetPoint("BOTTOMRIGHT", buildBtn, "BOTTOMRIGHT", -1,   1)
-    buildShadow:SetDrawLayer("OVERLAY", -1)
 
     -- runBuild: the actual build kickoff, factored out of the click handler
     -- so both the direct path and the safe-summon confirmation popup can run
@@ -1696,53 +1759,74 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
         OnAccept     = function(_, data) runBuild(data) end,
     }
 
-    buildBtn:SetScript("OnClick", function()
-        local plan = readPlan()
-        if ns.DebugF then ns.DebugF("comp", "Build clicked: plan rows=%d", #plan) end
-        if #plan == 0 then ns.MsgErr("Grid is empty - nothing to build."); return end
+    -- buildBtn itself is created in the bottom action row (see below); its
+    -- click handler reuses runBuild + WARDEN_CONFIRM_BUILD defined here.
+    state.sidebar.summary = { numLbl = numLbl }
 
-        if (GetNumRaidMembers() > 0) or (GetNumPartyMembers() > 0) then
-            StaticPopup_Show("WARDEN_CONFIRM_BUILD", nil, nil, plan)
-            return
-        end
+    -- ----------------------------------------------------------
+    -- Pin Coverage + Summary to the bottom of the sidebar so they're always
+    -- visible, and constrain the scroll to the space above so only Slot Detail
+    -- scrolls. FILE actions + the Queue/Create/Stop controls now live in the
+    -- bottom action bar (built just below), which frees the sidebar for the
+    -- Coverage table + Summary + a taller Slot Detail.
+    -- ----------------------------------------------------------
+    sumHost:SetPoint("BOTTOMLEFT",  sidePanel.content, "BOTTOMLEFT",  4, 4)
+    sumHost:SetPoint("BOTTOMRIGHT", sidePanel.content, "BOTTOMRIGHT", -4, 4)
 
-        runBuild(plan)
-    end)
+    covHost:SetPoint("BOTTOMLEFT",  sumHost, "TOPLEFT",  0, 8)
+    covHost:SetPoint("BOTTOMRIGHT", sumHost, "TOPRIGHT", 0, 8)
 
-    state.sidebar.summary = { numLbl = numLbl, buildBtn = buildBtn }
+    -- Scroll occupies the top region, ending just above the coverage block.
+    sideScroll:ClearAllPoints()
+    sideScroll:SetPoint("TOPLEFT",  sidePanel.content, "TOPLEFT",  0, 0)
+    sideScroll:SetPoint("TOPRIGHT", sidePanel.content, "TOPRIGHT", -22, 0)
+    sideScroll:SetPoint("BOTTOM",   covHost, "TOP", 0, 6)
 
-    -- Thin gold-dim rule between Summary and File row
-    local ruleTop = sideChild:CreateTexture(nil, "ARTWORK")
-    ruleTop:SetTexture("Interface\\Buttons\\WHITE8x8")
-    ruleTop:SetVertexColor(0.72, 0.58, 0.21, 0.35)
-    ruleTop:SetHeight(1)
-    ruleTop:SetPoint("TOPLEFT",  sumHost, "BOTTOMLEFT",  0, -4)
-    ruleTop:SetPoint("TOPRIGHT", sumHost, "BOTTOMRIGHT", 0, -4)
+    -- ============================================================
+    -- Bottom action bar - the wide strip beneath the grid + sidebar.
+    -- Top row: FILE actions (save/load/import/export/delete/clear/cleanup/
+    -- rename) in one horizontal line. Bottom row: Queue/Pending status (left)
+    -- + the Build / Create / Stop Build action group (right). Consolidating
+    -- these here gets them out of the sidebar and the floating page bottom,
+    -- giving the rest more room.
+    -- ============================================================
+    local actionBar = CreateFrame("Frame", "WardenCompActionBar", pane)
+    actionBar:SetHeight(60)
+    actionBar:SetPoint("BOTTOMLEFT",  pane, "BOTTOMLEFT",  12, 6)
+    actionBar:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -12, 6)
+    state.actionBar = actionBar
 
-    -- --- Section 4: File row (save / load / import / export / clear / cleanup) ---
-    -- UI-02: both rows of 3 buttons are uniform in size (same width, same
-    -- height, same gap); fileHost height is big enough that row 2 is never
-    -- clipped.
-    -- 4 buttons on row 1 (I/O actions: save/load/import/export) +
-    -- 3 buttons on row 2 (destructive: delete/clear/cleanup). Narrow the
-    -- per-button width so the 4-wide row fits inside sideChild (232 px).
-    -- Shrunk from 54 -> 48 so the 4th button on each row (export / resync)
-    -- doesn't get clipped by the sidebar scrollbar on smaller window sizes.
-    local FILE_BTN_W   = 48
+    local barBg = actionBar:CreateTexture(nil, "BACKGROUND")
+    barBg:SetTexture("Interface\\Buttons\\WHITE8x8")
+    barBg:SetVertexColor(0.10, 0.08, 0.05, 0.55)
+    barBg:SetAllPoints(actionBar)
+
+    local barRule = actionBar:CreateTexture(nil, "ARTWORK")
+    barRule:SetTexture("Interface\\Buttons\\WHITE8x8")
+    barRule:SetVertexColor(0.72, 0.58, 0.21, 0.45)
+    barRule:SetHeight(1)
+    barRule:SetPoint("TOPLEFT",  actionBar, "TOPLEFT",  0, 0)
+    barRule:SetPoint("TOPRIGHT", actionBar, "TOPRIGHT", 0, 0)
+
+    -- File row: one horizontal row of 8 uniform buttons along the bar top.
+    -- v1.2 (spacing pass): instead of a fixed 76px width that left a ragged
+    -- trailing gap before the right edge, derive the button width from the
+    -- pane so the eight buttons justify edge-to-edge - the last one (rename)
+    -- now lines up with the Stop Build right margin below it.
+    local FILE_COUNT   = 8
     local FILE_BTN_H   = 20
-    local FILE_BTN_GAP = 4
-    local FILE_HEADER_H = 16
-    local FILE_ROW_GAP  = 4
-    local FILE_BOTTOM_PAD = 4
-    local FILE_HOST_H  = FILE_HEADER_H + FILE_BTN_H + FILE_ROW_GAP + FILE_BTN_H + FILE_BOTTOM_PAD
+    local FILE_BTN_GAP = 5
+    local FILE_LABEL_RESERVE = 34   -- "FILE" label + 8px gap to first button
+    local fileAvail    = (PW - 36) - FILE_LABEL_RESERVE
+    local FILE_BTN_W   = math.floor((fileAvail - (FILE_COUNT - 1) * FILE_BTN_GAP) / FILE_COUNT)
 
-    local fileHost = CreateFrame("Frame", nil, sideChild)
-    fileHost:SetPoint("TOPLEFT",  ruleTop, "BOTTOMLEFT",  0, -4)
-    fileHost:SetPoint("TOPRIGHT", ruleTop, "BOTTOMRIGHT", 0, -4)
-    fileHost:SetHeight(FILE_HOST_H)
+    local fileHost = CreateFrame("Frame", nil, actionBar)
+    fileHost:SetHeight(FILE_BTN_H)
+    fileHost:SetPoint("TOPLEFT",  actionBar, "TOPLEFT",  6, -6)
+    fileHost:SetPoint("TOPRIGHT", actionBar, "TOPRIGHT", -6, -6)
 
     local fileHeader = fileHost:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    fileHeader:SetPoint("TOPLEFT", fileHost, "TOPLEFT", 0, -2)
+    fileHeader:SetPoint("LEFT", fileHost, "LEFT", 0, 0)
     fileHeader:SetText("FILE")
     fileHeader:SetTextColor(0.72, 0.58, 0.21, 1)
 
@@ -1756,20 +1840,20 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
                                          "WARDEN_CONFIRM_CLEANUP")
     local resyncBtn = ns.UI.Button.stone(fileHost, "resync",  FILE_BTN_W, FILE_BTN_H)
 
-    saveBtn  :SetPoint("TOPLEFT",    fileHost, "TOPLEFT",      0, -FILE_HEADER_H)
-    loadBtn  :SetPoint("LEFT",       saveBtn,  "RIGHT",        FILE_BTN_GAP, 0)
-    importBtn:SetPoint("LEFT",       loadBtn,  "RIGHT",        FILE_BTN_GAP, 0)
-    exportBtn:SetPoint("LEFT",       importBtn,"RIGHT",        FILE_BTN_GAP, 0)
-    deleteBtn:SetPoint("TOPLEFT",    saveBtn,  "BOTTOMLEFT",   0, -FILE_ROW_GAP)
-    clearBtn :SetPoint("LEFT",       deleteBtn,"RIGHT",        FILE_BTN_GAP, 0)
-    cleanBtn :SetPoint("LEFT",       clearBtn, "RIGHT",        FILE_BTN_GAP, 0)
-    resyncBtn:SetPoint("LEFT",       cleanBtn, "RIGHT",        FILE_BTN_GAP, 0)
+    saveBtn  :SetPoint("LEFT", fileHeader, "RIGHT", 8, 0)
+    loadBtn  :SetPoint("LEFT", saveBtn,    "RIGHT", FILE_BTN_GAP, 0)
+    importBtn:SetPoint("LEFT", loadBtn,    "RIGHT", FILE_BTN_GAP, 0)
+    exportBtn:SetPoint("LEFT", importBtn,  "RIGHT", FILE_BTN_GAP, 0)
+    deleteBtn:SetPoint("LEFT", exportBtn,  "RIGHT", FILE_BTN_GAP, 0)
+    clearBtn :SetPoint("LEFT", deleteBtn,  "RIGHT", FILE_BTN_GAP, 0)
+    cleanBtn :SetPoint("LEFT", clearBtn,   "RIGHT", FILE_BTN_GAP, 0)
+    resyncBtn:SetPoint("LEFT", cleanBtn,   "RIGHT", FILE_BTN_GAP, 0)
     -- Hidden in v1.0.0 - feature kept in code, just not exposed in the UI.
     -- Re-show by deleting the next line.
     resyncBtn:Hide()
 
-    -- Rename a saved comp. Occupies row 2's 4th cell (same anchor as the
-    -- hidden resync button) so no layout math changes.
+    -- Rename a saved comp. Occupies the 8th cell (same anchor as the hidden
+    -- resync button) so no layout math changes.
     local renameBtn = ns.UI.Button.stone(fileHost, "rename", FILE_BTN_W, FILE_BTN_H)
     renameBtn:SetPoint("LEFT", cleanBtn, "RIGHT", FILE_BTN_GAP, 0)
 
@@ -2028,37 +2112,28 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
         end
     end)
 
-    sideChild:SetHeight(
-        4 + DETAIL_H + 6 + covHost:GetHeight() + 8 + 42 + 8 + FILE_HOST_H + 4)
+    -- Scroll child now holds only the Slot Detail section; coverage / summary /
+    -- file row live in the fixed bottom stack outside the scroll.
+    sideChild:SetHeight(4 + DETAIL_H + 4)
 
     -- P1 review: the Re-Spec / Stop / Buffs / BL / Auto-spec strip used to
     -- live here, but it duplicated controls already available on the Controls
     -- tab (BL, Buffs) and on the Settings tab (Auto-spec) - and it doesn't
     -- belong on a composition-editor page conceptually. Removed.
 
-    -- Status line (muted mono, bottom-left)
-    local statusLbl = pane:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    statusLbl:SetPoint("BOTTOMLEFT", pane, "BOTTOMLEFT", 12, 4)
-    statusLbl:SetText("Queue: 0   Pending: 0")
+    -- ----------------------------------------------------------
+    -- Bottom action row: Queue/Pending status (left) + the primary action
+    -- group [Build | Create | Stop Build] (right). All three are one height
+    -- and equal width with even gaps, so they read as a single deliberate
+    -- control cluster instead of scattered buttons. Build moved here from the
+    -- sidebar so every "do it" button lives together on one line.
+    -- ----------------------------------------------------------
+    local ACT_BTN_W, ACT_BTN_H, ACT_GAP = 84, 22, 6
 
-    pane._statusAccum = 0
-    pane:SetScript("OnUpdate", function(self, elapsed)
-        self._statusAccum = (self._statusAccum or 0) + elapsed
-        if self._statusAccum < 0.2 then return end
-        self._statusAccum = 0
-        if ns.Engine and ns.Engine.QueueDepth then
-            statusLbl:SetText(string.format("Queue: %d   Pending: %d",
-                ns.Engine.QueueDepth(),
-                ns.Engine.PendingSpecCount and ns.Engine.PendingSpecCount() or 0))
-        end
-    end)
-
-    -- Stop button: aborts an in-progress Build by wiping the summon / spec /
-    -- whisper queues (ns.Engine.Stop). Until now the only way to halt a
-    -- runaway build was /reload - Engine.Stop() existed but was wired to no
-    -- control (the old action strip that held it was removed, see above).
-    local stopBtn = ns.UI.Button.warn(pane, "Stop Build", 96, 22)
-    stopBtn:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -12, 4)
+    -- Stop: aborts an in-progress Build by wiping the summon / spec / whisper
+    -- queues (ns.Engine.Stop). Rightmost of the group.
+    local stopBtn = ns.UI.Button.warn(pane, "Stop Build", ACT_BTN_W, ACT_BTN_H)
+    stopBtn:SetPoint("BOTTOMRIGHT", actionBar, "BOTTOMRIGHT", -6, 6)
     stopBtn:SetScript("OnClick", function()
         if ns.Engine and ns.Engine.Stop then
             ns.Engine.Stop()
@@ -2071,8 +2146,8 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     -- always behind a confirm. NOTE: a full role-based raid re-sort is not part
     -- of this chain yet (that's the separate sort feature); the build still
     -- auto-moves the player to their [P] slot.
-    local createBtn = ns.UI.Button.red(pane, "Create", 72, 22)
-    createBtn:SetPoint("RIGHT", stopBtn, "LEFT", -6, 0)
+    local createBtn = ns.UI.Button.red(pane, "Create", ACT_BTN_W, ACT_BTN_H)
+    createBtn:SetPoint("RIGHT", stopBtn, "LEFT", -ACT_GAP, 0)
     StaticPopupDialogs["WARDEN_CONFIRM_CREATE"] = {
         text         = "Create raid:\nremoves ALL current bots, re-summons this comp, gears them (init=epic + autogear) and applies world buffs. Proceed?",
         button1      = YES, button2 = NO, timeout = 0,
@@ -2087,6 +2162,42 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
         local plan = readPlan()
         if #plan == 0 then ns.MsgErr("Grid is empty - nothing to create."); return end
         StaticPopup_Show("WARDEN_CONFIRM_CREATE", nil, nil, plan)
+    end)
+
+    -- Build: the primary build kickoff, moved down from the sidebar so it sits
+    -- in the action group. Reuses runBuild + WARDEN_CONFIRM_BUILD from above.
+    local buildBtn = ns.UI.Button.red(pane, "Build", ACT_BTN_W, ACT_BTN_H)
+    buildBtn:SetPoint("RIGHT", createBtn, "LEFT", -ACT_GAP, 0)
+    local buildFS = buildBtn:GetFontString()
+    if buildFS then buildFS:SetTextColor(1.00, 0.92, 0.75) end
+    buildBtn:SetScript("OnClick", function()
+        local plan = readPlan()
+        if ns.DebugF then ns.DebugF("comp", "Build clicked: plan rows=%d", #plan) end
+        if #plan == 0 then ns.MsgErr("Grid is empty - nothing to build."); return end
+        if (GetNumRaidMembers() > 0) or (GetNumPartyMembers() > 0) then
+            StaticPopup_Show("WARDEN_CONFIRM_BUILD", nil, nil, plan)
+            return
+        end
+        runBuild(plan)
+    end)
+    if state.sidebar.summary then state.sidebar.summary.buildBtn = buildBtn end
+
+    -- Status line (muted) - left of the action row, vertically centered on the
+    -- button cluster so the row reads as one band.
+    local statusLbl = pane:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    statusLbl:SetPoint("LEFT", actionBar, "BOTTOMLEFT", 8, 6 + ACT_BTN_H / 2)
+    statusLbl:SetText("Queue: 0   Pending: 0")
+
+    pane._statusAccum = 0
+    pane:SetScript("OnUpdate", function(self, elapsed)
+        self._statusAccum = (self._statusAccum or 0) + elapsed
+        if self._statusAccum < 0.2 then return end
+        self._statusAccum = 0
+        if ns.Engine and ns.Engine.QueueDepth then
+            statusLbl:SetText(string.format("Queue: %d   Pending: %d",
+                ns.Engine.QueueDepth(),
+                ns.Engine.PendingSpecCount and ns.Engine.PendingSpecCount() or 0))
+        end
     end)
 
     -- Final wiring

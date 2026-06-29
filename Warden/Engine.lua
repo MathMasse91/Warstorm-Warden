@@ -57,9 +57,18 @@ local PER_INVITE_TIMEOUT = 8
 -- ----------------------------------------------------------
 -- Public API - send queue
 -- ----------------------------------------------------------
-function ns.Engine.Queue(msg)
+-- channel/target are optional. When either is supplied the entry is stored as
+-- a table { msg, channel, target } so the drain can route it (e.g. a WHISPER
+-- to a named bot); legacy callers pass only `msg` and we keep inserting the
+-- bare string, which the drain still handles. This lets WardenMantle + the
+-- Spec tab funnel spec whispers through the same throttle as bot-add commands.
+function ns.Engine.Queue(msg, channel, target)
     if type(msg) ~= "string" or msg == "" then return end
-    table.insert(ns.Engine.state.sendQueue, msg)
+    if channel or target then
+        table.insert(ns.Engine.state.sendQueue, { msg = msg, channel = channel, target = target })
+    else
+        table.insert(ns.Engine.state.sendQueue, msg)
+    end
     ns.Engine.state.sending = true
     ns.Engine.ArmSendTicker()
 end
@@ -125,8 +134,17 @@ local function sendTick(self, elapsed)
     if s.elapsed < interval then return end
     s.elapsed = 0
 
-    local msg = table.remove(s.sendQueue, 1)
-    SendChatMessage(msg, (db and db.commandChannel) or "SAY")
+    -- Entries are either a bare string (bot-add command on the command
+    -- channel) or a table { msg, channel, target } for routed sends such as
+    -- spec whispers. Both drain on the same throttle.
+    local item = table.remove(s.sendQueue, 1)
+    local msg, ch, tgt
+    if type(item) == "table" then
+        msg, ch, tgt = item.msg, item.channel, item.target
+    else
+        msg = item
+    end
+    SendChatMessage(msg, ch or (db and db.commandChannel) or "SAY", nil, tgt)
     s.lastAddSentAt    = GetTime()
     s.counters.spawned = s.counters.spawned + 1
     -- Arm the join gate for the next send only while building (see above).
@@ -384,23 +402,41 @@ function ns.Engine.MovePlayerToGroup(targetGroup)
     return false
 end
 
--- Deferred move: waits `delay` seconds (to let ConvertToRaid propagate)
--- then runs MovePlayerToGroup. Reuses a single shared frame so repeated
--- builds don't leak frames. A later call overwrites the pending target.
+-- Deferred move: waits `delay` seconds, then RETRIES MovePlayerToGroup every
+-- `delay` seconds until it succeeds or a deadline passes. The retry matters
+-- because a build that starts from solo / a small party has NO raid yet when
+-- the first attempt fires - the party->raid conversion only completes once
+-- enough bots have joined (see the roster watcher / completer). A single
+-- one-shot attempt would no-op against the not-yet-existing raid and the
+-- player would be stranded in the wrong subgroup. Polling moves them into
+-- their [P] slot's group as soon as the raid actually forms.
+-- MovePlayerToGroup returns true when the move lands OR the player is already
+-- in the target group, and false while there's no raid / player not found -
+-- so "retry until true" converges cleanly. Reuses one shared frame.
 local _moveDelayFrame
 function ns.Engine.SchedulePlayerMove(targetGroup, delay)
     if not targetGroup then return end
     if not _moveDelayFrame then
         _moveDelayFrame = CreateFrame("Frame", "WardenPlayerMoveDelay")
     end
-    _moveDelayFrame._target  = targetGroup
-    _moveDelayFrame._elapsed = 0
-    _moveDelayFrame._delay   = delay or 0.5
-    _moveDelayFrame:SetScript("OnUpdate", function(self, dt)
-        self._elapsed = self._elapsed + dt
-        if self._elapsed >= self._delay then
-            self:SetScript("OnUpdate", nil)
-            ns.Engine.MovePlayerToGroup(self._target)
+    local f = _moveDelayFrame
+    f._target     = targetGroup
+    f._elapsed    = 0
+    f._delay      = delay or 0.5
+    f._sinceStart = 0
+    f._deadline   = 15        -- keep trying up to 15s while the raid assembles
+    f:SetScript("OnUpdate", function(self, dt)
+        self._elapsed    = self._elapsed + dt
+        self._sinceStart = self._sinceStart + dt
+        if self._elapsed < self._delay then return end
+        self._elapsed = 0
+        if ns.Engine.MovePlayerToGroup(self._target) then
+            self:SetScript("OnUpdate", nil)          -- moved / already in place
+        elseif self._sinceStart >= self._deadline then
+            self:SetScript("OnUpdate", nil)          -- raid never formed - give up
+            if ns.LogF then
+                ns.LogF("player auto-move: gave up after %ds (no raid?)", self._deadline)
+            end
         end
     end)
 end
@@ -993,9 +1029,9 @@ function ns.Engine.MarkAndAttack(mark)
 end
 
 -- Kept as an alias because Bindings.xml + RTSC bindings still reference it.
-function ns.Engine.Enqueue(msg)
+function ns.Engine.Enqueue(msg, channel, target)
     if not msg or msg == "" then return end
-    ns.Engine.Queue(msg)
+    ns.Engine.Queue(msg, channel, target)
 end
 
 -- Bloodlust / Heroism toggle. Shaman-only; priest/mage equivalents don't

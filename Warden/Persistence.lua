@@ -19,7 +19,7 @@ local COMMIT_SCALARS = {
 }
 
 -- Subtables preserved whole; always written so freshly-added keys survive.
-local COMMIT_SUBTABLES = { "comps", "playerFlags", "sword", "shield", "pocket" }
+local COMMIT_SUBTABLES = { "comps", "playerFlags", "sword", "shield", "pocket", "mantle" }
 
 -- ----------------------------------------------------------
 -- Schema init (idempotent)
@@ -72,6 +72,14 @@ local function initDB()
     if type(sh.hidden)     ~= "boolean" then sh.hidden     = false end
     if type(sh.captureSec) ~= "number"  then sh.captureSec = 5     end
     if type(sh.exclusions) ~= "table"   then sh.exclusions = {}    end
+
+    -- WardenMantle (/wm spec-swap HUD) persisted state. Hidden until the
+    -- user opens it with /wm, then position + lock persist across /reload.
+    if type(db.mantle) ~= "table" then db.mantle = {} end
+    local mt = db.mantle
+    if type(mt.pos)    ~= "table"   then mt.pos    = nil  end
+    if type(mt.locked) ~= "boolean" then mt.locked = false end
+    if type(mt.hidden) ~= "boolean" then mt.hidden = true end
 
     -- WardenPocket (/wp WTS aggregator) persisted state.
     if type(db.pocket) ~= "table" then db.pocket = {} end
