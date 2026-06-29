@@ -131,16 +131,14 @@ A hands-off **WTS auction** tool that sells to bot buyers for you.
 
 ### 🎽 WardenMantle — `/wm`
 
-A small floating **bot-management HUD** for whatever you're targeting.
+A small floating **spec-swap HUD** (successor to feysSpecManager) for whatever bot you're targeting — its core job is fast on-the-fly spec switching.
 
-- **Target line** — portrait + class-colored name + level of the current target (or "No Target")
-- **Summon** — summon the targeted bot to you
-- **Autogear** — run the bot's autogear pass
-- **BOT INIT** — pick a gear rarity (Common / Uncommon / Rare / Epic) then hit **ResetBot** to send `.warstormbot bot init=<rarity>`, re-rolling the bot's gear at that quality
+- **Target line** — portrait + class-colored name + spec count of the current target (or "No Target")
+- **Spec tiles** — PvE and PvP rows of the target's specs; click a tile to whisper `talents spec <spec>` to that bot. The swap is recorded by GUID, so a Comp-tab Re-Spec re-applies it after a retarget
+- **Summon** — summon bots to you · **Autogear** — run the autogear pass
+- **BOT INIT** — pick a gear rarity (Common / Uncommon / Rare / Epic) then hit **ResetBot** to send `.warstormbot bot init=<rarity>`, re-rolling bot gear at that quality
 - Draggable / lockable, position persists across `/reload`
 - Every command funnels through the same throttled Engine queue as the rest of Warden (no chat-flood mutes)
-
-> Replaces the old spec-swap card: spec switching lives on the **Spec** tab, so WardenMantle is now purely about summoning, gearing, and resetting bots.
 
 ### 📋 Presets
 

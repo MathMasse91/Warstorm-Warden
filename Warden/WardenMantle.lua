@@ -1,13 +1,18 @@
 -- =====================================================
 -- Warden - WardenMantle.lua
--- Floating bot-management HUD card. Target a bot (or not) and drive the
--- non-target-specific bot actions from one place: Summon, Autogear, and
--- ResetBot (the "level up" / bot-init re-gear, picked by rarity tier).
--- Chrome (drag / lock / position / footer ticker / public API) clones
--- WardenSword.lua.
+-- Floating spec-swap HUD card (successor to feysSpecManager). Target a bot
+-- and click a spec tile to whisper "talents spec <spec>" through the throttled
+-- Engine.Queue; the swap is recorded by GUID so a Comp-tab Re-Spec re-applies
+-- it after a retarget. The spec manager is the core of this HUD.
+--
+-- Alongside the spec tiles it also carries the global bot actions: Summon,
+-- Autogear, and a BOT INIT rarity dropdown + ResetBot button that re-rolls the
+-- targeted/all bots' gear via `.warstormbot bot init=<rarity>`. Chrome (drag /
+-- lock / position / footer ticker / public API) clones WardenSword.lua.
 --
 -- Invariant: this file contains ZERO direct SendChatMessage calls - every
--- outbound message routes through ns.Engine.Queue / ns.Engine.WhisperAll.
+-- outbound message routes through ns.Engine.Queue / ns.Engine.WhisperAll /
+-- SPEC_EXEC.
 -- =====================================================
 
 local _, ns = ...
@@ -19,8 +24,10 @@ ns.WardenMantle = ns.WardenMantle or {}
 local WIDTH      = 222
 local HEADER_H   = 22
 local PAD        = 8
+local TILE_GAP   = 6
+local CAP_H      = 12
 local ROW_GAP    = 8
-local DIV_H      = 14
+local DIV_H      = 16
 local FOOTER_H   = 20
 local PORTRAIT   = 30
 
@@ -45,6 +52,8 @@ end
 -- State
 -- ----------------------------------------------------------
 local frame          -- top-level HUD frame
+local tilePool = {}  -- reusable spec-tile buttons
+local tileCursor = 0
 local initRarity = "epic"
 
 -- ----------------------------------------------------------
@@ -54,12 +63,12 @@ local function db() return ns.Persistence and ns.Persistence.DB end
 local function mt() local d = db(); return d and d.mantle end
 
 -- Resolve the bot to act on: the hard target when it's another player.
--- Returns name, classToken - or nil when there is no valid target.
+-- Returns name, classToken, guid - or nil when there is no valid target.
 local function resolveTarget()
     if UnitExists("target") and UnitIsPlayer("target")
        and not UnitIsUnit("target", "player") then
         local _, class = UnitClass("target")
-        return UnitName("target"), class
+        return UnitName("target"), class, UnitGUID("target")
     end
     return nil
 end
@@ -123,6 +132,139 @@ local function buildHeader(parent)
 end
 
 -- ----------------------------------------------------------
+-- Spec tile pool
+-- ----------------------------------------------------------
+local function createTile()
+    local b = CreateFrame("Button", nil, frame)
+    b:EnableMouse(true)
+    b:RegisterForClicks("LeftButtonUp")
+    b:SetBackdrop({
+        bgFile   = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    b:SetBackdropColor(0.04, 0.03, 0.02, 1)
+    b:SetBackdropBorderColor(ns.Tokens.gold_rim[1], ns.Tokens.gold_rim[2], ns.Tokens.gold_rim[3], 1)
+
+    local tex = b:CreateTexture(nil, "ARTWORK")
+    tex:SetPoint("TOPLEFT",     b, "TOPLEFT",      1, -1)
+    tex:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -1,  1)
+    tex:SetTexCoord(0.07, 0.93, 0.07, 0.93)  -- trim default icon border
+    b.tex = tex
+
+    local code = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    code:SetPoint("CENTER", b, "CENTER", 0, 0)
+    b.code = code
+
+    local cap = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    cap:SetPoint("TOP", b, "BOTTOM", 0, -2)
+    cap:SetTextColor(0.80, 0.72, 0.54, 1)
+    b.cap = cap
+
+    b:SetScript("OnEnter", function(self)
+        self:SetBackdropBorderColor(1.00, 0.82, 0.00, 1)
+    end)
+    b:SetScript("OnLeave", function(self)
+        self:SetBackdropBorderColor(ns.Tokens.gold_rim[1], ns.Tokens.gold_rim[2], ns.Tokens.gold_rim[3], 1)
+    end)
+    return b
+end
+
+local function nextTile()
+    tileCursor = tileCursor + 1
+    local t = tilePool[tileCursor]
+    if not t then t = createTile(); tilePool[tileCursor] = t end
+    return t
+end
+
+local function hideUnusedTiles()
+    for i = tileCursor + 1, #tilePool do
+        if tilePool[i] then tilePool[i]:Hide() end
+    end
+end
+
+-- Lay out one PvE/PvP row of spec tiles; return the y just below the row.
+local function layoutSpecRow(entries, class, modeLabel, topY)
+    local n = #entries
+    if n == 0 then return topY end
+    local contentW = WIDTH - PAD * 2
+    -- Small square tiles: at least 50% smaller than a row-filling tile, capped
+    -- at 30px, and centered so the row doesn't look sparse.
+    local fullW = math.floor((contentW - (n - 1) * TILE_GAP) / n)
+    local tileW = math.min(30, math.max(18, math.floor(fullW * 0.5)))
+    local tileH = tileW
+    local total  = n * tileW + (n - 1) * TILE_GAP
+    local startX = PAD + math.max(0, math.floor((contentW - total) / 2))
+    local icons = ns.Data.SPEC_ICONS[class]
+    local cc = RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+
+    for i, e in ipairs(entries) do
+        local t = nextTile()
+        t:ClearAllPoints()
+        t:SetPoint("TOPLEFT", frame, "TOPLEFT", startX + (i - 1) * (tileW + TILE_GAP), -topY)
+        t:SetSize(tileW, tileH)
+
+        local icon = icons and icons[e.base]
+        if icon then
+            t.tex:SetTexture(icon)
+            t.tex:Show()
+            t.code:Hide()
+            t:SetBackdropColor(0.04, 0.03, 0.02, 1)
+        else
+            t.tex:Hide()
+            t.code:SetText(ns.Data.SpecLabel(e.base))
+            t.code:Show()
+            if cc then
+                t:SetBackdropColor(cc.r * 0.40, cc.g * 0.40, cc.b * 0.40, 1)
+                t.code:SetTextColor(cc.r, cc.g, cc.b, 1)
+            else
+                t:SetBackdropColor(0.18, 0.14, 0.10, 1)
+                t.code:SetTextColor(1, 1, 1, 1)
+            end
+        end
+
+        t.cap:SetText(ns.Data.SpecCaption(e.base))
+        ns.UI.Tooltip.Attach(t, ns.Data.SpecCaption(e.base) .. " (" .. modeLabel .. ")",
+            "Whisper talents spec to " .. (resolveTarget() or "target") .. ".", "ANCHOR_TOP")
+
+        local spec = e.spec
+        t:SetScript("OnClick", function()
+            local name, curClass, guid = resolveTarget()
+            if not name then
+                ns.MsgErr("Target a bot first.")
+                return
+            end
+            if curClass ~= class then
+                ns.MsgWarn("That target isn't a " .. class .. " - retarget to use this tile.")
+                return
+            end
+            local tbl = ns.Data.SPEC_EXEC[class]
+            local fn  = tbl and tbl[spec]
+            if not fn then
+                ns.MsgWarn("No execution defined for " .. class .. " - " .. spec)
+                return
+            end
+            fn(name)  -- enqueues the WHISPER through Engine.Queue (A-bridge)
+
+            if guid and ns.Engine and ns.Engine.state and ns.Engine.state.assignedSpecs then
+                local prev = ns.Engine.state.assignedSpecs[guid] or {}
+                ns.Engine.state.assignedSpecs[guid] = {
+                    name       = name,
+                    spec       = spec,
+                    classToken = class,
+                    opt1       = prev.opt1,
+                    opt2       = prev.opt2,
+                }
+            end
+            ns.MsgInfo(string.format("Sent `talents spec %s` -> %s.",
+                spec, ns.ColorClass(class, name)))
+        end)
+        t:Show()
+    end
+    return topY + tileH + CAP_H
+end
+
+-- ----------------------------------------------------------
 -- Body widgets (built once, repositioned each Refresh)
 -- ----------------------------------------------------------
 local function buildBody()
@@ -157,6 +299,16 @@ local function buildBody()
     noTarget:SetTextColor(0.45, 0.38, 0.28, 1)
     frame.noTarget = noTarget
 
+    -- PvE / PvP divider labels
+    local function divLabel(text)
+        local l = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        l:SetText(text)
+        l:SetTextColor(1.00, 0.82, 0.00, 1)
+        return l
+    end
+    frame.pveLbl = divLabel("PvE")
+    frame.pvpLbl = divLabel("PvP")
+
     -- Action row: Summon (group) + Autogear (PARTY). Both are global bot
     -- actions, so they show in every target state.
     local summonBtn = ns.UI.Button.stone(frame, "Summon", 60, 18)
@@ -166,8 +318,6 @@ local function buildBody()
     end)
     frame.summonBtn = summonBtn
 
-    -- Autogear moves into the action row (the spot vacated by the old Level
-    -- whisper button).
     local ag = ns.UI.Button.gold(frame, "Autogear", 60, 18)
     ag:SetScript("OnClick", function()
         ns.Engine.Queue("autogear", "PARTY")
@@ -175,11 +325,9 @@ local function buildBody()
     end)
     frame.autogear = ag
 
-    -- BOT INIT section (replaces the removed spec-swap tiles). The rarity
-    -- dropdown picks the gear tier; ResetBot re-rolls every bot's gear via
-    -- `.warstormbot bot init=<rarity>` on the command channel - the same
-    -- "level up" logic the Spec tab exposes, routed through Engine.Queue so
-    -- the no-direct-SendChatMessage invariant holds.
+    -- BOT INIT section: rarity dropdown + ResetBot. ResetBot re-rolls bot gear
+    -- via `.warstormbot bot init=<rarity>` on the command channel - routed
+    -- through Engine.Queue so the no-direct-SendChatMessage invariant holds.
     local biLbl = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     biLbl:SetText("BOT INIT")
     biLbl:SetTextColor(1.00, 0.82, 0.00, 1)
@@ -223,7 +371,7 @@ local function buildBody()
     foot:SetBackdropBorderColor(0.18, 0.14, 0.10, 1)
     local lf = foot:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     lf:SetPoint("LEFT", foot, "LEFT", 6, 0)
-    lf:SetText("bot |cffffd100init|r -> reset gear")
+    lf:SetText("whisper |cffffd100talents spec|r")
     lf:SetTextColor(0.61, 0.55, 0.40, 1)
     local rf = foot:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     rf:SetPoint("RIGHT", foot, "RIGHT", -6, 0)
@@ -244,8 +392,10 @@ end
 -- ----------------------------------------------------------
 local function Refresh()
     if not frame then return end
+    tileCursor = 0
 
     local name, class = resolveTarget()
+    local rows = class and ns.Data.MantleRows(class) or nil
 
     local p, nameLbl, subLbl = frame.portrait, frame.nameLbl, frame.subLbl
     local y = HEADER_H + 6
@@ -259,13 +409,13 @@ local function Refresh()
     subLbl:ClearAllPoints()
     subLbl:SetPoint("TOPLEFT", nameLbl, "BOTTOMLEFT", 0, -2)
 
-    if name and class then
+    if rows then
         frame.noTarget:Hide()
         SetPortraitTexture(p.tex, "target")
-        nameLbl:SetText(ns.ColorClass(class, name))
+        nameLbl:SetText(ns.ColorClass(class, name or "?"))
         nameLbl:Show()
-        subLbl:SetText(string.format("%s \194\183 LVL %d",
-            (ns.Data.CLASS_LABEL[class] or class):upper(), UnitLevel("target") or 0))
+        subLbl:SetText(string.format("%s \194\183 %d SPECS",
+            (ns.Data.CLASS_LABEL[class] or class):upper(), #rows.pve + #rows.pvp))
         subLbl:Show()
     else
         p.tex:SetTexture(nil)
@@ -276,7 +426,8 @@ local function Refresh()
     end
     y = y + PORTRAIT + ROW_GAP
 
-    -- Action row: Summon (left) + Autogear (right), half-width each.
+    -- Action row: Summon (left) + Autogear (right), half-width each. Global
+    -- actions, shown in both target states.
     local contentW = WIDTH - PAD * 2
     local bw = math.floor((contentW - 6) / 2)
     frame.summonBtn:ClearAllPoints()
@@ -289,7 +440,27 @@ local function Refresh()
     frame.autogear:Show()
     y = y + 18 + ROW_GAP
 
-    -- BOT INIT label
+    -- Spec manager (the core): PvE + PvP tile rows when the target is a known
+    -- bot class. Hidden when there's no valid target.
+    if rows then
+        frame.pveLbl:ClearAllPoints()
+        frame.pveLbl:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, -y - 2)
+        frame.pveLbl:Show()
+        y = y + DIV_H
+        y = layoutSpecRow(rows.pve, class, "PvE", y)
+        y = y + ROW_GAP
+
+        frame.pvpLbl:ClearAllPoints()
+        frame.pvpLbl:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, -y - 2)
+        frame.pvpLbl:Show()
+        y = y + DIV_H
+        y = layoutSpecRow(rows.pvp, class, "PvP", y)
+        y = y + ROW_GAP
+    else
+        frame.pveLbl:Hide(); frame.pvpLbl:Hide()
+    end
+
+    -- BOT INIT label (always shown - global gear re-roll).
     frame.biLbl:ClearAllPoints()
     frame.biLbl:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, -y - 2)
     frame.biLbl:Show()
@@ -311,6 +482,7 @@ local function Refresh()
     frame.footer:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -y)
     y = y + FOOTER_H + PAD
 
+    hideUnusedTiles()
     frame:SetSize(WIDTH, y)
     refreshFooterQueue()
     refreshLockButton(frame.header and frame.header.lockBtn)
@@ -381,7 +553,7 @@ local function build()
         refreshFooterQueue()
     end)
 
-    -- Re-render when the target changes.
+    -- Re-render rows when the target changes.
     frame:RegisterEvent("PLAYER_TARGET_CHANGED")
     frame:SetScript("OnEvent", function() Refresh() end)
 
@@ -432,7 +604,7 @@ end
 function ns.WardenMantle.PrintHelp()
     ns.MsgInfo("WardenMantle commands:")
     local rows = {
-        { "/wm",            "toggle the bot-management HUD" },
+        { "/wm",            "toggle the spec-swap HUD" },
         { "/wm show|hide",  "explicit show / hide" },
         { "/wm lock|unlock","lock or unlock position" },
         { "/wm reset",      "reset position" },
