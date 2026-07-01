@@ -19,7 +19,7 @@ local COMMIT_SCALARS = {
 }
 
 -- Subtables preserved whole; always written so freshly-added keys survive.
-local COMMIT_SUBTABLES = { "comps", "playerFlags", "sword", "shield", "pocket", "mantle" }
+local COMMIT_SUBTABLES = { "comps", "playerFlags", "sword", "shield", "pocket", "mantle", "whisperFilters" }
 
 -- ----------------------------------------------------------
 -- Schema init (idempotent)
@@ -51,6 +51,10 @@ local function initDB()
     -- group. Off by default; opt-in from Settings because pattern matching on
     -- whisper text can theoretically catch an unwanted real whisper.
     if type(db.whisperFilter)        ~= "boolean" then db.whisperFilter = false end
+    -- Per-line toggles for the WhisperBlocker. The table exists here; the
+    -- individual default-on keys are seeded by ns.WhisperBlocker.SeedDefaults()
+    -- (keys live with the patterns, not here) once the DB is ready.
+    if type(db.whisperFilters)       ~= "table"   then db.whisperFilters = {} end
     if type(db.playerFlags)          ~= "table"   then db.playerFlags = {} end
 
     -- WardenSword (mid-fight HUD) persisted state.

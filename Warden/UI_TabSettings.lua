@@ -41,7 +41,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     -- ============================================================
     -- Panel 1 - Global settings
     -- ============================================================
-    local globalP = ns.UI.Panel.Create(content, contentW - 16, 208, "Global settings")
+    local globalP = ns.UI.Panel.Create(content, contentW - 16, 130, "Global settings")
     globalP:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -4)
 
     -- Thin adapter over ns.UI.Check.Make so existing call-sites keep the
@@ -57,20 +57,6 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
         "When a bot joins during a Build, Warden whispers them their planned spec automatically.")
     mkCheck(globalP.content, "Auto-match group type to comp size", 4, -28, "autoRaidDuringBuild",
         "Build-time group adjustment. If the comp needs more than 5 members, party is promoted to raid. If the comp fits in 5 and you're already in a raid with <=5 members, the raid is collapsed back to party. Requires leader rights and is skipped in combat. Run Cleanup first if a stale >5 raid is blocking the party collapse.")
-
-    -- WhisperBlocker toggle (per user: lives here in Global settings). Opt-in;
-    -- the warning below spells out the exact bot line it targets. Only
-    -- whispers from senders OUTSIDE your party/raid are ever hidden.
-    mkCheck(globalP.content, "Block external bot invite whispers", 4, -54, "whisperFilter",
-        "Hides the walk-by whispers WarStorm playerbots send, e.g. \"Invite me to your group first\" and \"I am in a full group. Will do it later\". Only affects senders that are NOT in your party/raid - a bot already in your group, or a real player, always gets through.")
-
-    local whispWarn = globalP.content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    whispWarn:SetPoint("TOPLEFT", globalP.content, "TOPLEFT",  6, -78)
-    whispWarn:SetPoint("RIGHT",   globalP.content, "RIGHT",   -6,   0)
-    whispWarn:SetJustifyH("LEFT")
-    whispWarn:SetWordWrap(true)
-    whispWarn:SetText("|cffffaa00Warning:|r filters bot lines like \"Invite me to your group first\" or \"I am in a full group. Will do it later\".\nMay hide an unwanted real whisper with that wording. Group members are never affected.")
-    whispWarn:SetTextColor(0.85, 0.72, 0.4, 1)
 
     -- Window size dropdown (replaces the mousewheel zoom). Four presets
     -- map to the masterScale values that used to live on the slider.
@@ -90,7 +76,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     end
 
     local sizeLbl = globalP.content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    sizeLbl:SetPoint("TOPLEFT", globalP.content, "TOPLEFT", 4, -136)
+    sizeLbl:SetPoint("TOPLEFT", globalP.content, "TOPLEFT", 4, -56)
     sizeLbl:SetText("Window size")
 
     local sizeDrop = CreateFrame("Frame", "WardenSizeDrop", globalP.content, "UIDropDownMenuTemplate")
@@ -114,11 +100,49 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     UIDropDownMenu_SetText(sizeDrop, labelForScale(db.masterScale))
 
     -- ============================================================
+    -- Panel 1b - Bot whisper filter. Master opt-in + one checkbox per bot
+    -- line so the user picks exactly which get hidden. Off by default. Only
+    -- whispers from senders OUTSIDE your group are hidden for the invite
+    -- lines; the "own bot" lines (Equipping / Staying) are hidden regardless.
+    -- ============================================================
+    db.whisperFilters = db.whisperFilters or {}
+    if ns.WhisperBlocker and ns.WhisperBlocker.SeedDefaults then
+        ns.WhisperBlocker.SeedDefaults()
+    end
+
+    local whisperP = ns.UI.Panel.Create(content, contentW - 16, 236, "Bot whisper filter")
+    whisperP:SetPoint("TOPLEFT", globalP, "BOTTOMLEFT", 0, -6)
+
+    mkCheck(whisperP.content, "Block bot noise whispers", 4, -2, "whisperFilter",
+        "Master switch. Hides the whispers WarStorm playerbots spam - walk-by \"invite me\" lines and your own bots' \"Equipping\"/\"Staying\" acks. Real players are never touched; a bot must be a bot, and the invite lines only apply to senders outside your group.")
+
+    local whispWarn = whisperP.content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    whispWarn:SetPoint("TOPLEFT", whisperP.content, "TOPLEFT",  6, -26)
+    whispWarn:SetPoint("RIGHT",   whisperP.content, "RIGHT",   -6,   0)
+    whispWarn:SetJustifyH("LEFT")
+    whispWarn:SetWordWrap(true)
+    whispWarn:SetText("|cffffaa00Note:|r a real player could in theory whisper one of these exact lines. Untick any line below to keep it visible. Party/raid members are never affected by the invite lines.")
+    whispWarn:SetTextColor(0.85, 0.72, 0.4, 1)
+
+    local linesLbl = whisperP.content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    linesLbl:SetPoint("TOPLEFT", whisperP.content, "TOPLEFT", 4, -64)
+    linesLbl:SetText("LINES TO HIDE")
+    linesLbl:SetTextColor(0.72, 0.58, 0.21, 1)
+
+    local wy = -82
+    for _, p in ipairs(ns.WhisperBlocker and ns.WhisperBlocker.PATTERNS or {}) do
+        local cb = ns.UI.Check.Make(whisperP.content, "WardenSetting_wf_" .. p.key,
+            p.label, db.whisperFilters, p.key, { echo = false })
+        cb:SetPoint("TOPLEFT", whisperP.content, "TOPLEFT", 8, wy)
+        wy = wy - 22
+    end
+
+    -- ============================================================
     -- Panel 2 - Session stats (PATCH_NOTES §13a: 3-col grid instead of a
     -- single cluttered line).
     -- ============================================================
     local statsP = ns.UI.Panel.Create(content, contentW - 16, 70, "Session stats")
-    statsP:SetPoint("TOPLEFT", globalP, "BOTTOMLEFT", 0, -6)
+    statsP:SetPoint("TOPLEFT", whisperP, "BOTTOMLEFT", 0, -6)
 
     local STAT_DEFS = {
         { "Spawned",       "spawned" },
@@ -343,7 +367,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
 
     -- Final scroll-child height: sum of panel heights + 6 px gaps + 4 px top
     -- margin + 8 px bottom padding. Keep in sync if panel heights change.
-    content:SetHeight(4 + 208 + 6 + 70 + 6 + 180 + 6 + 96 + 6 + 80 + 8)
+    content:SetHeight(4 + 130 + 6 + 236 + 6 + 70 + 6 + 180 + 6 + 96 + 6 + 80 + 8)
 end
 
 function ns.UI.Tabs.Settings.OnShow(pane)
