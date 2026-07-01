@@ -213,7 +213,7 @@ local CHAPTERS = {
         id = "mantle", group = "MODULES", title = "WardenMantle",
         eyebrow = "Modules \194\183 WardenMantle",
         body = {
-            { kind = "lede", text = "A floating spec-swap card \226\128\148 the successor to feysSpecManager. Target a bot, click a spec tile, done. It also carries the global bot actions: Summon, Autogear, and ResetBot. Built on Warden's own engine." },
+            { kind = "lede", text = "A floating spec-swap card \226\128\148 the successor to feysSpecManager. Target a bot, click a spec tile, done. It also carries the global bot actions: Summon, Autogear, and a gear-rarity re-roll. Built on Warden's own engine." },
             { kind = "h2",   text = "Open and close" },
             { kind = "p",    text = "|ck[/wm]| toggles. Hidden until you open it the first time, then position + lock persist across |ck[/reload]|. |kbd[x]| on the header hides it." },
             { kind = "h2",   text = "Lock and unlock" },
@@ -221,11 +221,11 @@ local CHAPTERS = {
             { kind = "h2",   text = "Target line" },
             { kind = "p",    text = "Shows the current target's portrait, class-colored name, and spec count. With no valid player target the card shows |em[No Target]| \226\128\148 the spec tiles hide, but the global actions below still work." },
             { kind = "h2",   text = "Spec swap" },
-            { kind = "p",    text = "PvE and PvP rows show the targeted bot's specs. Click a tile to whisper |ck[talents spec <spec>]| to that bot \226\128\148 the swap is recorded by GUID, so a Comp-tab Re-Spec re-applies it after a retarget. Hover a tile for its caption." },
+            { kind = "p",    text = "|kbd[PvE]| and |kbd[PvP]| rows show the targeted bot's specs \226\128\148 the label sits inline to the left of each row, and the icons stay a fixed size no matter how many specs a class has (the druid's 4 PvE specs included). Click a tile to whisper |ck[talents spec <spec>]| to that bot \226\128\148 the swap is recorded by GUID, so a Comp-tab Re-Spec re-applies it after a retarget. Hover a tile for its caption + mode." },
             { kind = "h2",   text = "Actions" },
-            { kind = "p",    text = "|ck[Summon]| recalls bots, |ck[Autogear]| sends |ck[autogear]| to PARTY. Under |em[BOT INIT]|, pick a gear tier in the rarity dropdown, then |ck[ResetBot]| re-rolls every bot via |ck[.warstormbot bot init=<rarity>]| on the command channel." },
-            { kind = "h2",   text = "Mute-safe" },
-            { kind = "p",    text = "Every command drains through the same throttled queue as bot-add commands, so rapid clicks never trip the server flood mute. The footer shows live queue depth |ck[q N]|." },
+            { kind = "p",    text = "|ck[Summon]| whispers |ck[summon]| straight to the |em[targeted]| bot, so that specific bot comes to you (not a party-wide call). |ck[Autogear]| sends |ck[autogear]| to PARTY. Pick a gear tier in the rarity dropdown, then |ck[RB]| (|em[Reset Bot]| \226\128\148 hover for the full tooltip) re-rolls the bot's gear via |ck[.warstormbot bot init=<rarity>]| on the command channel." },
+            { kind = "h2",   text = "Instant whispers" },
+            { kind = "p",    text = "Mantle whispers fire |em[immediately]| \226\128\148 you drive it one bot at a time, so there's no flood risk and no throttle delay between clicking a tile (or Summon) and the whisper going out. The mass Build / Re-Spec paths stay throttled to respect the server's 10-whispers/10s mute." },
             { kind = "h2",   text = "Commands" },
             { kind = "table", rows = {
                 { "/wm",                "Toggle the HUD." },
@@ -359,6 +359,7 @@ local CHAPTERS = {
             { kind = "bullets", items = {
                 "Auto-Spec on Build \226\128\148 whisper planned spec when a bot joins.",
                 "Party \226\134\146 Raid auto-conversion when a Build reaches five or more bots.",
+                "Block external bot invite whispers \226\128\148 hides the walk-by |ck[Invite me to your group first]| / |ck[I am in a full group. Will do it later]| whispers WarStorm playerbots fire at you. Off by default. Only affects senders NOT in your party/raid, and only those exact bot lines \226\128\148 a real player, or a bot already grouped, always gets through.",
                 "Window size: Small (0.80) / Medium (1.00) / Large (1.20) / XL (1.40). Applies live.",
                 "Session stats: Spawned / Spec'd / Pending / Tracked / Send queue / Whisper queue. Refreshes every 0.5s.",
             }},

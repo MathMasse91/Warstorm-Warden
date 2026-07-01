@@ -131,14 +131,16 @@ A hands-off **WTS auction** tool that sells to bot buyers for you.
 
 ### 🎽 WardenMantle — `/wm`
 
+![WardenMantle](docs/images/mantle.png)
+
 A small floating **spec-swap HUD** (successor to feysSpecManager) for whatever bot you're targeting — its core job is fast on-the-fly spec switching.
 
 - **Target line** — portrait + class-colored name + spec count of the current target (or "No Target")
-- **Spec tiles** — PvE and PvP rows of the target's specs; click a tile to whisper `talents spec <spec>` to that bot. The swap is recorded by GUID, so a Comp-tab Re-Spec re-applies it after a retarget
-- **Summon** — summon bots to you · **Autogear** — run the autogear pass
-- **BOT INIT** — pick a gear rarity (Common / Uncommon / Rare / Epic) then hit **ResetBot** to send `.warstormbot bot init=<rarity>`, re-rolling bot gear at that quality
+- **Spec tiles** — `PvE` and `PvP` rows of the target's specs (label sits inline to the left; icons stay a fixed size even for the druid's 4 PvE specs). Click a tile to whisper `talents spec <spec>` to that bot. The swap is recorded by GUID, so a Comp-tab Re-Spec re-applies it after a retarget
+- **Summon** — whispers `summon` straight to the *targeted* bot, so that specific bot comes to you (not a party-wide call) · **Autogear** — runs the autogear pass on the party
+- **Rarity + RB** — pick a gear rarity (Common / Uncommon / Rare / Epic), then hit **RB** (*Reset Bot* — hover for the full tooltip) to send `.warstormbot bot init=<rarity>`, re-rolling bot gear at that quality
 - Draggable / lockable, position persists across `/reload`
-- Every command funnels through the same throttled Engine queue as the rest of Warden (no chat-flood mutes)
+- Mantle whispers fire **instantly** (un-throttled) — you drive it one bot at a time, so there's no flood risk. The mass build / Re-Spec paths stay throttled to respect the server's whisper mute
 
 ### 📋 Presets
 
@@ -159,6 +161,14 @@ A small floating **spec-swap HUD** (successor to feysSpecManager) for whatever b
 - Real player protection everywhere
 - Auto party → raid
 - Saves through reload / relog
+
+### 🔇 Bot whisper filter
+
+On WarStorm, playerbots whisper you an invite pitch every time you walk past one — `Invite me to your group first`, `I am in a full group. Will do it later`. Settings → **Block external bot invite whispers** silences exactly those lines.
+
+- **Off by default** — opt in from the Global settings panel.
+- **Targeted, not a blanket mute** — a whisper is hidden only when the sender is *not* in your party/raid **and** the text matches a known bot-invite line. A real player, or a bot already in your group, always gets through.
+- The toggle carries an in-UI warning, since matching on whisper text could in theory catch an unwanted real whisper with that exact wording.
 
 ---
 
