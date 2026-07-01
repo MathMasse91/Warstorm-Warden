@@ -763,6 +763,24 @@ function ns.Engine.PushWhisper(item)
     ns.Engine.ArmWhisperTicker()
 end
 
+-- Immediate, un-throttled whisper. Bypasses the whisperQueue ticker (which
+-- waits a full WHISPER_INTERVAL and queues behind any pending spec whispers)
+-- for latency-sensitive one-shots like WardenMantle's Summon, where any delay
+-- feels broken. Still honors the human-player guard so it can't message a real
+-- toon flagged as a player.
+function ns.Engine.WhisperNow(name, msg)
+    if type(name) ~= "string" or name == "" or not msg or msg == "" then return end
+    if ns.Persistence and ns.Persistence.IsPlayerName
+       and ns.Persistence.IsPlayerName(name) then
+        if ns.LogF then
+            ns.LogF("WhisperNow: skipped '%s' (flagged as human player)", name)
+        end
+        return
+    end
+    SendChatMessage(msg, "WHISPER", nil, name)
+    if ns.LogF then ns.LogF("WhisperNow: '%s' -> %s", msg, name) end
+end
+
 -- ----------------------------------------------------------
 -- Build-completion ticker - prints summary when queues are empty or timeout hit.
 -- Self-disarms when build ends; re-armed by StartBuild().

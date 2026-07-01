@@ -70,10 +70,16 @@ ns.Data.DEFAULT_SPEC_PVE = {
 -- Re-Spec) and lets WardenMantle reuse SPEC_EXEC for mute-safe spec swaps.
 -- ns.Engine resolves at call time (post-login), so Data-before-Engine load
 -- order is fine.
-local function whisperSpec(specServerName, targetName)
+-- `immediate` (opt-in) skips the throttle and fires the whisper right away via
+-- ns.Engine.WhisperNow. WardenMantle passes it so its single-target manual spec
+-- clicks are instant; the Spec tab / mass Re-Spec callers omit it and keep
+-- draining on the shared throttle (which guards the server 10-whispers/10s mute).
+local function whisperSpec(specServerName, targetName, immediate)
     local target = targetName or UnitName("target")
     if not target then return end
-    if ns.Engine and ns.Engine.Queue then
+    if immediate and ns.Engine and ns.Engine.WhisperNow then
+        ns.Engine.WhisperNow(target, "talents spec " .. specServerName)
+    elseif ns.Engine and ns.Engine.Queue then
         ns.Engine.Queue("talents spec " .. specServerName, "WHISPER", target)
     else
         SendChatMessage("talents spec " .. specServerName, "WHISPER", nil, target)
@@ -81,7 +87,7 @@ local function whisperSpec(specServerName, targetName)
 end
 
 local function mkSpec(serverName)
-    return function(targetName) whisperSpec(serverName, targetName) end
+    return function(targetName, immediate) whisperSpec(serverName, targetName, immediate) end
 end
 
 ns.Data.SPEC_EXEC = {

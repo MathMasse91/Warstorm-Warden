@@ -5,14 +5,15 @@
 -- Engine.Queue; the swap is recorded by GUID so a Comp-tab Re-Spec re-applies
 -- it after a retarget. The spec manager is the core of this HUD.
 --
--- Alongside the spec tiles it also carries the global bot actions: Summon,
--- Autogear, and a BOT INIT rarity dropdown + ResetBot button that re-rolls the
--- targeted/all bots' gear via `.warstormbot bot init=<rarity>`. Chrome (drag /
--- lock / position / footer ticker / public API) clones WardenSword.lua.
+-- Alongside the spec tiles it also carries the global bot actions: Summon
+-- (whispers `summon` straight to the targeted bot, un-throttled so it fires
+-- instantly), Autogear, and a rarity dropdown + compact RB button that re-rolls
+-- the targeted/all bots' gear via `.warstormbot bot init=<rarity>`. Chrome
+-- (drag / lock / position / public API) clones WardenSword.lua.
 --
 -- Invariant: this file contains ZERO direct SendChatMessage calls - every
 -- outbound message routes through ns.Engine.Queue / ns.Engine.WhisperAll /
--- SPEC_EXEC.
+-- ns.Engine.WhisperNow / SPEC_EXEC.
 -- =====================================================
 
 local _, ns = ...
@@ -21,14 +22,12 @@ ns.WardenMantle = ns.WardenMantle or {}
 -- ----------------------------------------------------------
 -- Geometry
 -- ----------------------------------------------------------
-local WIDTH      = 222
+local WIDTH      = 206
 local HEADER_H   = 22
 local PAD        = 8
 local TILE_GAP   = 6
 local CAP_H      = 12
-local ROW_GAP    = 8
-local DIV_H      = 16
-local FOOTER_H   = 20
+local ROW_GAP    = 6
 local PORTRAIT   = 30
 
 -- ----------------------------------------------------------
@@ -96,7 +95,7 @@ local function buildHeader(parent)
 
     local title = h:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("LEFT", h, "LEFT", PAD, 0)
-    title:SetText("WARDENMANTLE")
+    title:SetText("WARDEN MANTLE")
     title:SetTextColor(1.00, 0.82, 0.00, 1)
 
     local hint = h:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -183,25 +182,50 @@ local function hideUnusedTiles()
     end
 end
 
--- Lay out one PvE/PvP row of spec tiles; return the y just below the row.
-local function layoutSpecRow(entries, class, modeLabel, topY)
+-- Room reserved at the left of a spec row for its inline PvE/PvP label.
+local LABEL_GUTTER = 28
+
+-- Lay out one PvE/PvP row of spec tiles with its label on the SAME line (in the
+-- left gutter, vertically centered on the tiles). Returns the y below the row.
+local function layoutSpecRow(entries, class, modeLabel, topY, label)
     local n = #entries
-    if n == 0 then return topY end
-    local contentW = WIDTH - PAD * 2
-    -- Small square tiles: at least 50% smaller than a row-filling tile, capped
-    -- at 30px, and centered so the row doesn't look sparse.
-    local fullW = math.floor((contentW - (n - 1) * TILE_GAP) / n)
-    local tileW = math.min(30, math.max(18, math.floor(fullW * 0.5)))
+    if n == 0 then
+        if label then label:Hide() end
+        return topY
+    end
+    -- Usable width for the tile row = frame minus BOTH side pads minus the
+    -- label gutter. (The missing right pad is what pushed the druid's 4th icon
+    -- and its "Balance" caption out past the right border.)
+    local contentW = WIDTH - PAD * 2 - LABEL_GUTTER
+    -- Fixed 30px icons regardless of spec count: druids have 4 PvE specs, and
+    -- scaling the tile down by count made those icons tiny with captions piled
+    -- on top of each other. Only shrink if a row genuinely can't fit at 30px.
+    local tileW = 30
+    if n * tileW + (n - 1) * TILE_GAP > contentW then
+        tileW = math.max(18, math.floor((contentW - (n - 1) * TILE_GAP) / n))
+    end
     local tileH = tileW
-    local total  = n * tileW + (n - 1) * TILE_GAP
-    local startX = PAD + math.max(0, math.floor((contentW - total) / 2))
+    -- Spread the gap so captions ("Balance", "Resto"...) don't collide, but cap
+    -- it low: a large gap pushes the last tile (and its overhanging caption)
+    -- rightward, back out of the frame. 10px is enough to separate captions.
+    local gap = TILE_GAP
+    if n > 1 then
+        gap = math.min(10, math.max(TILE_GAP, math.floor((contentW - n * tileW) / (n - 1))))
+    end
+    local startX = PAD + LABEL_GUTTER
     local icons = ns.Data.SPEC_ICONS[class]
     local cc = RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+
+    if label then
+        label:ClearAllPoints()
+        label:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, -(topY + math.floor((tileH - 12) / 2)))
+        label:Show()
+    end
 
     for i, e in ipairs(entries) do
         local t = nextTile()
         t:ClearAllPoints()
-        t:SetPoint("TOPLEFT", frame, "TOPLEFT", startX + (i - 1) * (tileW + TILE_GAP), -topY)
+        t:SetPoint("TOPLEFT", frame, "TOPLEFT", startX + (i - 1) * (tileW + gap), -topY)
         t:SetSize(tileW, tileH)
 
         local icon = icons and icons[e.base]
@@ -244,7 +268,7 @@ local function layoutSpecRow(entries, class, modeLabel, topY)
                 ns.MsgWarn("No execution defined for " .. class .. " - " .. spec)
                 return
             end
-            fn(name)  -- enqueues the WHISPER through Engine.Queue (A-bridge)
+            fn(name, true)  -- immediate=true: un-throttled whisper (no WM button throttles)
 
             if guid and ns.Engine and ns.Engine.state and ns.Engine.state.assignedSpecs then
                 local prev = ns.Engine.state.assignedSpecs[guid] or {}
@@ -309,12 +333,18 @@ local function buildBody()
     frame.pveLbl = divLabel("PvE")
     frame.pvpLbl = divLabel("PvP")
 
-    -- Action row: Summon (group) + Autogear (PARTY). Both are global bot
-    -- actions, so they show in every target state.
+    -- Action row: Summon + Autogear (PARTY). Autogear is a global bot action;
+    -- Summon is directed - it whispers `summon` straight to the targeted bot
+    -- (that is the one you want pulled to you), not the party channel.
     local summonBtn = ns.UI.Button.stone(frame, "Summon", 60, 18)
     summonBtn:SetScript("OnClick", function()
-        if ns.Engine and ns.Engine.WhisperAll then ns.Engine.WhisperAll("summon") end
-        ns.MsgInfo("Sent `summon`.")
+        local name, class = resolveTarget()
+        if not name then
+            ns.MsgErr("Target a bot first.")
+            return
+        end
+        ns.Engine.WhisperNow(name, "summon")
+        ns.MsgInfo(string.format("Whispered `summon` -> %s.", ns.ColorClass(class, name)))
     end)
     frame.summonBtn = summonBtn
 
@@ -325,14 +355,10 @@ local function buildBody()
     end)
     frame.autogear = ag
 
-    -- BOT INIT section: rarity dropdown + ResetBot. ResetBot re-rolls bot gear
-    -- via `.warstormbot bot init=<rarity>` on the command channel - routed
+    -- Bot-gear re-roll: rarity dropdown + compact RB button. RB re-rolls bot
+    -- gear via `.warstormbot bot init=<rarity>` on the command channel - routed
     -- through Engine.Queue so the no-direct-SendChatMessage invariant holds.
-    local biLbl = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    biLbl:SetText("BOT INIT")
-    biLbl:SetTextColor(1.00, 0.82, 0.00, 1)
-    frame.biLbl = biLbl
-
+    -- The label is dropped (the rarity + RB tooltip carry the meaning).
     local rarityDrop = CreateFrame("Frame", "WardenMantleRarityDrop", frame, "UIDropDownMenuTemplate")
     ns.UI.Dropdown.style(rarityDrop, 96)
     UIDropDownMenu_Initialize(rarityDrop, function()
@@ -350,41 +376,19 @@ local function buildBody()
     UIDropDownMenu_SetText(rarityDrop, rarityText(initRarity))
     frame.rarityDrop = rarityDrop
 
-    local resetBtn = ns.UI.Button.gold(frame, "ResetBot", 90, 20)
+    -- Compact "RB" button (was "ResetBot"): label stays tiny to shrink the
+    -- card's footprint; the full meaning shows in a hover tooltip.
+    local resetBtn = ns.UI.Button.gold(frame, "RB", 30, 20)
     resetBtn:SetScript("OnClick", function()
         local chan = (db() and db().commandChannel) or "SAY"
         local rarity = initRarity or "epic"
         ns.Engine.Queue(".warstormbot bot init=" .. rarity, chan)
         ns.MsgInfo(string.format("Sent `.warstormbot bot init=%s` (%s).", rarity, chan))
     end)
+    ns.UI.Tooltip.Attach(resetBtn, "Reset Bot gear",
+        "Re-rolls the targeted / all bots' gear at the selected rarity (.warstormbot bot init).",
+        "ANCHOR_TOP")
     frame.resetBtn = resetBtn
-
-    -- Footer strip
-    local foot = CreateFrame("Frame", nil, frame)
-    foot:SetHeight(FOOTER_H)
-    foot:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    foot:SetBackdropColor(0.07, 0.05, 0.03, 1)
-    foot:SetBackdropBorderColor(0.18, 0.14, 0.10, 1)
-    local lf = foot:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    lf:SetPoint("LEFT", foot, "LEFT", 6, 0)
-    lf:SetText("whisper |cffffd100talents spec|r")
-    lf:SetTextColor(0.61, 0.55, 0.40, 1)
-    local rf = foot:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    rf:SetPoint("RIGHT", foot, "RIGHT", -6, 0)
-    rf:SetTextColor(0.61, 0.55, 0.40, 1)
-    foot.qfs = rf
-    frame.footer = foot
-end
-
-local function refreshFooterQueue()
-    if frame and frame.footer and frame.footer.qfs then
-        local q = (ns.Engine.QueueDepth and ns.Engine.QueueDepth()) or 0
-        frame.footer.qfs:SetText(string.format("q |cffffd100%d|r", q))
-    end
 end
 
 -- ----------------------------------------------------------
@@ -443,48 +447,28 @@ local function Refresh()
     -- Spec manager (the core): PvE + PvP tile rows when the target is a known
     -- bot class. Hidden when there's no valid target.
     if rows then
-        frame.pveLbl:ClearAllPoints()
-        frame.pveLbl:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, -y - 2)
-        frame.pveLbl:Show()
-        y = y + DIV_H
-        y = layoutSpecRow(rows.pve, class, "PvE", y)
+        y = layoutSpecRow(rows.pve, class, "PvE", y, frame.pveLbl)
         y = y + ROW_GAP
-
-        frame.pvpLbl:ClearAllPoints()
-        frame.pvpLbl:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, -y - 2)
-        frame.pvpLbl:Show()
-        y = y + DIV_H
-        y = layoutSpecRow(rows.pvp, class, "PvP", y)
+        y = layoutSpecRow(rows.pvp, class, "PvP", y, frame.pvpLbl)
         y = y + ROW_GAP
     else
         frame.pveLbl:Hide(); frame.pvpLbl:Hide()
     end
 
-    -- BOT INIT label (always shown - global gear re-roll).
-    frame.biLbl:ClearAllPoints()
-    frame.biLbl:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD, -y - 2)
-    frame.biLbl:Show()
-    y = y + DIV_H
-
-    -- Rarity dropdown (left) + ResetBot (right). UIDropDownMenuTemplate carries
-    -- a ~16px left inset, so nudge x to line its text up with PAD.
+    -- Gear re-roll row: rarity dropdown (left) + compact RB (right after it).
+    -- UIDropDownMenuTemplate carries a ~16px left inset, so nudge x to line its
+    -- text up with PAD; RB anchors to the dropdown's right edge (negative x to
+    -- absorb the template's right chrome) so the pair reads as one control.
     frame.rarityDrop:ClearAllPoints()
     frame.rarityDrop:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD - 14, -y + 2)
     frame.rarityDrop:Show()
     frame.resetBtn:ClearAllPoints()
-    frame.resetBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -y - 4)
+    frame.resetBtn:SetPoint("LEFT", frame.rarityDrop, "RIGHT", -6, 3)
     frame.resetBtn:Show()
-    y = y + 26 + ROW_GAP
-
-    -- Footer
-    frame.footer:ClearAllPoints()
-    frame.footer:SetPoint("TOPLEFT",  frame, "TOPLEFT",  PAD, -y)
-    frame.footer:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -PAD, -y)
-    y = y + FOOTER_H + PAD
+    y = y + 24 + PAD
 
     hideUnusedTiles()
     frame:SetSize(WIDTH, y)
-    refreshFooterQueue()
     refreshLockButton(frame.header and frame.header.lockBtn)
 end
 ns.WardenMantle.Refresh = Refresh
@@ -543,15 +527,6 @@ local function build()
 
     frame.header = buildHeader(frame)
     buildBody()
-
-    -- Footer ticker - refresh queue depth twice a second.
-    frame._tick = 0
-    frame:SetScript("OnUpdate", function(self, elapsed)
-        self._tick = (self._tick or 0) + elapsed
-        if self._tick < 0.5 then return end
-        self._tick = 0
-        refreshFooterQueue()
-    end)
 
     -- Re-render rows when the target changes.
     frame:RegisterEvent("PLAYER_TARGET_CHANGED")

@@ -15,7 +15,7 @@ local COMMIT_SCALARS = {
     "lastComp", "autoRaidDuringBuild", "autoSpec",
     "bloodlust", "aoe", "burn",
     "disperseDist", "minimapAngle", "masterScale", "activeTab",
-    "helpLastChapter",
+    "helpLastChapter", "whisperFilter",
 }
 
 -- Subtables preserved whole; always written so freshly-added keys survive.
@@ -47,6 +47,10 @@ local function initDB()
     if type(db.masterScale)          ~= "number"  then db.masterScale = 1.0 end
     if type(db.activeTab)            ~= "number"  then db.activeTab = 1 end
     if type(db.helpLastChapter)      ~= "string"  then db.helpLastChapter = "intro" end
+    -- WhisperBlocker: suppress bot invite whispers from senders outside your
+    -- group. Off by default; opt-in from Settings because pattern matching on
+    -- whisper text can theoretically catch an unwanted real whisper.
+    if type(db.whisperFilter)        ~= "boolean" then db.whisperFilter = false end
     if type(db.playerFlags)          ~= "table"   then db.playerFlags = {} end
 
     -- WardenSword (mid-fight HUD) persisted state.

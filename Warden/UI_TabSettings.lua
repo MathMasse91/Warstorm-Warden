@@ -41,7 +41,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     -- ============================================================
     -- Panel 1 - Global settings
     -- ============================================================
-    local globalP = ns.UI.Panel.Create(content, contentW - 16, 130, "Global settings")
+    local globalP = ns.UI.Panel.Create(content, contentW - 16, 208, "Global settings")
     globalP:SetPoint("TOPLEFT", content, "TOPLEFT", 8, -4)
 
     -- Thin adapter over ns.UI.Check.Make so existing call-sites keep the
@@ -57,6 +57,20 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
         "When a bot joins during a Build, Warden whispers them their planned spec automatically.")
     mkCheck(globalP.content, "Auto-match group type to comp size", 4, -28, "autoRaidDuringBuild",
         "Build-time group adjustment. If the comp needs more than 5 members, party is promoted to raid. If the comp fits in 5 and you're already in a raid with <=5 members, the raid is collapsed back to party. Requires leader rights and is skipped in combat. Run Cleanup first if a stale >5 raid is blocking the party collapse.")
+
+    -- WhisperBlocker toggle (per user: lives here in Global settings). Opt-in;
+    -- the warning below spells out the exact bot line it targets. Only
+    -- whispers from senders OUTSIDE your party/raid are ever hidden.
+    mkCheck(globalP.content, "Block external bot invite whispers", 4, -54, "whisperFilter",
+        "Hides the walk-by whispers WarStorm playerbots send, e.g. \"Invite me to your group first\" and \"I am in a full group. Will do it later\". Only affects senders that are NOT in your party/raid - a bot already in your group, or a real player, always gets through.")
+
+    local whispWarn = globalP.content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    whispWarn:SetPoint("TOPLEFT", globalP.content, "TOPLEFT",  6, -78)
+    whispWarn:SetPoint("RIGHT",   globalP.content, "RIGHT",   -6,   0)
+    whispWarn:SetJustifyH("LEFT")
+    whispWarn:SetWordWrap(true)
+    whispWarn:SetText("|cffffaa00Warning:|r filters bot lines like \"Invite me to your group first\" or \"I am in a full group. Will do it later\".\nMay hide an unwanted real whisper with that wording. Group members are never affected.")
+    whispWarn:SetTextColor(0.85, 0.72, 0.4, 1)
 
     -- Window size dropdown (replaces the mousewheel zoom). Four presets
     -- map to the masterScale values that used to live on the slider.
@@ -76,7 +90,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     end
 
     local sizeLbl = globalP.content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    sizeLbl:SetPoint("TOPLEFT", globalP.content, "TOPLEFT", 4, -58)
+    sizeLbl:SetPoint("TOPLEFT", globalP.content, "TOPLEFT", 4, -136)
     sizeLbl:SetText("Window size")
 
     local sizeDrop = CreateFrame("Frame", "WardenSizeDrop", globalP.content, "UIDropDownMenuTemplate")
@@ -329,7 +343,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
 
     -- Final scroll-child height: sum of panel heights + 6 px gaps + 4 px top
     -- margin + 8 px bottom padding. Keep in sync if panel heights change.
-    content:SetHeight(4 + 130 + 6 + 70 + 6 + 180 + 6 + 96 + 6 + 80 + 8)
+    content:SetHeight(4 + 208 + 6 + 70 + 6 + 180 + 6 + 96 + 6 + 80 + 8)
 end
 
 function ns.UI.Tabs.Settings.OnShow(pane)
@@ -339,4 +353,6 @@ function ns.UI.Tabs.Settings.OnShow(pane)
     if a then a:SetChecked(db.autoSpec == true) end
     local b = _G["WardenSetting_autoRaidDuringBuild"]
     if b then b:SetChecked(db.autoRaidDuringBuild == true) end
+    local w = _G["WardenSetting_whisperFilter"]
+    if w then w:SetChecked(db.whisperFilter == true) end
 end
