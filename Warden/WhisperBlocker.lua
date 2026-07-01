@@ -29,12 +29,17 @@ ns.WhisperBlocker = ns.WhisperBlocker or {}
 -- Exact in-game text (WarStorm playerbot walk-by whispers):
 --   "Invite me to your group first"
 --   "I am in a full group. Will do it later"
+--   "I am in a group with <player>. You can ask him for invite"
 -- We match the stable distinctive cores so trailing/leading word or
--- punctuation variation still catches them.
+-- punctuation variation still catches them. For the third line the player
+-- name (and the him/her pronoun) change every time, so we bridge the two
+-- stable anchors "i am in a group with" and "for invite" with a lazy `.-`
+-- wildcard that swallows whatever name/pronoun sits between them.
 -- ----------------------------------------------------------
 local BOT_INVITE_PATTERNS = {
     "invite me to your group",
     "in a full group%. will do it later",
+    "i am in a group with .- for invite",
 }
 
 -- ----------------------------------------------------------
