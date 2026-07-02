@@ -461,16 +461,53 @@ local CHAPTERS = {
 
 -- =====================================================================
 -- §3.4 renderers
--- Each takes (content, y, node) and returns the new y. Created Regions
--- must be appended to content._spawned so SetChapter can wipe them on the
--- next switch.
+-- Each takes (content, y, node) and returns the new y.
+--
+-- Region pooling: WoW never garbage-collects a created FontString/Texture/
+-- Frame, so the old approach of CreateFontString-per-render leaked a fresh
+-- set of regions on every chapter click for the whole session. Instead we
+-- keep one pool per region "kind" and REUSE regions across SetChapter calls.
+-- SetChapter resets every pool's cursor before rendering (poolReset), each
+-- renderer acquire()s regions in order (creating one only if the pool has no
+-- free slot at that cursor), and after rendering any pooled regions the new
+-- chapter didn't use are hidden (poolHideUnused). Visible output is identical.
 -- =====================================================================
 local T = ns.Tokens
 
-local function track(content, region)
-    content._spawned = content._spawned or {}
-    table.insert(content._spawned, region)
-    return region
+-- kind -> { list = { region, ... }, cursor = <count used this render> }
+local _pools = {}
+
+-- Rewind every pool so the next render reuses regions from the start.
+local function poolReset()
+    for _, p in pairs(_pools) do p.cursor = 0 end
+end
+
+-- Return the next free region of `kind`, creating it via factory() only if the
+-- pool doesn't already have one at this cursor position. Caller re-anchors and
+-- re-configures it, so we clear points and show it here.
+local function acquire(kind, factory)
+    local p = _pools[kind]
+    if not p then p = { list = {}, cursor = 0 }; _pools[kind] = p end
+    p.cursor = p.cursor + 1
+    local r = p.list[p.cursor]
+    if not r then
+        r = factory()
+        p.list[p.cursor] = r
+    end
+    r:ClearAllPoints()
+    r:Show()
+    return r
+end
+
+-- Hide any pooled regions left over past each pool's cursor (i.e. created for a
+-- busier chapter but unused by the current one).
+local function poolHideUnused()
+    for _, p in pairs(_pools) do
+        for i = p.cursor + 1, #p.list do
+            p.list[i]:Hide()
+            p.list[i]:ClearAllPoints()
+        end
+    end
 end
 
 local function readerInnerW(content)
@@ -481,7 +518,9 @@ end
 
 local function renderLede(content, y, node)
     local w = readerInnerW(content) - READER_PAD_SIDE * 2 - 10
-    local fs = track(content, content:CreateFontString(nil, "OVERLAY", "GameFontHighlight"))
+    local fs = acquire("lede.fs", function()
+        return content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    end)
     fs:SetPoint("TOPLEFT", content, "TOPLEFT", READER_PAD_SIDE + 10, y)
     fs:SetWidth(math.max(50, w))
     fs:SetJustifyH("LEFT")
@@ -491,7 +530,9 @@ local function renderLede(content, y, node)
     local h = math.max(14, fs:GetStringHeight())
     fs:SetHeight(h)
 
-    local rule = track(content, content:CreateTexture(nil, "ARTWORK"))
+    local rule = acquire("lede.rule", function()
+        return content:CreateTexture(nil, "ARTWORK")
+    end)
     rule:SetTexture("Interface\\Buttons\\WHITE8x8")
     rule:SetVertexColor(T.gold_rim[1], T.gold_rim[2], T.gold_rim[3], 0.9)
     rule:SetWidth(2)
@@ -503,7 +544,9 @@ end
 
 local function renderH2(content, y, node)
     y = y - 16
-    local fs = track(content, content:CreateFontString(nil, "OVERLAY", "GameFontNormal"))
+    local fs = acquire("h2.fs", function()
+        return content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    end)
     fs:SetPoint("TOPLEFT", content, "TOPLEFT", READER_PAD_SIDE + 12, y)
     fs:SetWidth(readerInnerW(content) - READER_PAD_SIDE * 2 - 12)
     fs:SetJustifyH("LEFT")
@@ -512,7 +555,9 @@ local function renderH2(content, y, node)
     local h = fs:GetStringHeight()
     fs:SetHeight(h)
 
-    local pip = track(content, content:CreateTexture(nil, "ARTWORK"))
+    local pip = acquire("h2.pip", function()
+        return content:CreateTexture(nil, "ARTWORK")
+    end)
     pip:SetTexture("Interface\\Buttons\\WHITE8x8")
     pip:SetVertexColor(T.gold[1], T.gold[2], T.gold[3], 1)
     pip:SetSize(4, 4)
@@ -523,7 +568,9 @@ end
 
 local function renderP(content, y, node)
     local w = readerInnerW(content) - READER_PAD_SIDE * 2
-    local fs = track(content, content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall"))
+    local fs = acquire("p.fs", function()
+        return content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    end)
     fs:SetPoint("TOPLEFT", content, "TOPLEFT", READER_PAD_SIDE, y)
     fs:SetWidth(math.max(50, w))
     fs:SetJustifyH("LEFT")
@@ -541,23 +588,31 @@ local function renderSteps(content, y, node)
     for i, txt in ipairs(items) do
         local rowTop = y
 
-        local pad = track(content, CreateFrame("Frame", nil, content))
+        -- The number badge lives as a child FontString on the pooled pad frame
+        -- (pad.num), so it is reused whenever the pad is reused.
+        local pad = acquire("steps.pad", function()
+            local f = CreateFrame("Frame", nil, content)
+            f:SetBackdrop({
+                bgFile   = "Interface\\Buttons\\WHITE8x8",
+                edgeFile = "Interface\\Buttons\\WHITE8x8",
+                edgeSize = 1,
+            })
+            f.num = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            f.num:SetPoint("CENTER", f, "CENTER", 0, 0)
+            return f
+        end)
         pad:SetSize(20, 20)
         pad:SetPoint("TOPLEFT", content, "TOPLEFT", READER_PAD_SIDE, rowTop - 1)
-        pad:SetBackdrop({
-            bgFile   = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Buttons\\WHITE8x8",
-            edgeSize = 1,
-        })
         pad:SetBackdropColor(T.stone_tile[1], T.stone_tile[2], T.stone_tile[3], 1)
         pad:SetBackdropBorderColor(T.gold_rim[1], T.gold_rim[2], T.gold_rim[3], 1)
 
-        local n = pad:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        n:SetPoint("CENTER", pad, "CENTER", 0, 0)
+        local n = pad.num
         n:SetText(tostring(i))
         n:SetTextColor(T.gold[1], T.gold[2], T.gold[3], 1)
 
-        local fs = track(content, content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall"))
+        local fs = acquire("steps.fs", function()
+            return content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        end)
         fs:SetPoint("TOPLEFT", content, "TOPLEFT", textX, rowTop)
         fs:SetWidth(math.max(50, textW))
         fs:SetJustifyH("LEFT")
@@ -579,7 +634,9 @@ local function renderBullets(content, y, node)
     for _, txt in ipairs(items) do
         local rowTop = y
 
-        local fs = track(content, content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall"))
+        local fs = acquire("bullets.fs", function()
+            return content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        end)
         fs:SetPoint("TOPLEFT", content, "TOPLEFT", textX, rowTop)
         fs:SetWidth(math.max(50, textW))
         fs:SetJustifyH("LEFT")
@@ -588,7 +645,9 @@ local function renderBullets(content, y, node)
         local h = math.max(14, fs:GetStringHeight())
         fs:SetHeight(h)
 
-        local dot = track(content, content:CreateTexture(nil, "ARTWORK"))
+        local dot = acquire("bullets.dot", function()
+            return content:CreateTexture(nil, "ARTWORK")
+        end)
         dot:SetTexture("Interface\\Buttons\\WHITE8x8")
         dot:SetVertexColor(T.gold_rim[1], T.gold_rim[2], T.gold_rim[3], 1)
         dot:SetSize(4, 1)
@@ -601,29 +660,37 @@ end
 
 local function renderCmd(content, y, node)
     local outerW = readerInnerW(content) - READER_PAD_SIDE * 2
-    local frame  = track(content, CreateFrame("Frame", nil, content))
+    -- The accent bar and body text are child regions of the pooled frame
+    -- (frame.accent / frame.textfs), so they are reused whenever it is.
+    local frame = acquire("cmd.frame", function()
+        local f = CreateFrame("Frame", nil, content)
+        f:SetBackdrop({
+            bgFile   = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        f.accent = f:CreateTexture(nil, "ARTWORK")
+        f.accent:SetTexture("Interface\\Buttons\\WHITE8x8")
+        f.accent:SetWidth(2)
+        f.accent:SetPoint("TOPLEFT",    f, "TOPLEFT",    0, 0)
+        f.accent:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
+
+        f.textfs = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        f.textfs:SetPoint("TOPLEFT",     f, "TOPLEFT",      12, -8)
+        f.textfs:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",  -8, 8)
+        f.textfs:SetJustifyH("LEFT"); f.textfs:SetJustifyV("TOP")
+        f.textfs:SetWordWrap(true); f.textfs:SetNonSpaceWrap(false)
+        return f
+    end)
     frame:SetPoint("TOPLEFT", content, "TOPLEFT", READER_PAD_SIDE, y)
     frame:SetWidth(math.max(50, outerW))
-    frame:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
     frame:SetBackdropColor(T.stone_mid[1], T.stone_mid[2], T.stone_mid[3], 1)
     frame:SetBackdropBorderColor(T.stone_rim[1], T.stone_rim[2], T.stone_rim[3], 1)
 
-    local accent = frame:CreateTexture(nil, "ARTWORK")
-    accent:SetTexture("Interface\\Buttons\\WHITE8x8")
+    local accent = frame.accent
     accent:SetVertexColor(T.gold_rim[1], T.gold_rim[2], T.gold_rim[3], 1)
-    accent:SetWidth(2)
-    accent:SetPoint("TOPLEFT",    frame, "TOPLEFT",    0, 0)
-    accent:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
 
-    local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    fs:SetPoint("TOPLEFT",     frame, "TOPLEFT",      12, -8)
-    fs:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT",  -8, 8)
-    fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP")
-    fs:SetWordWrap(true); fs:SetNonSpaceWrap(false)
+    local fs = frame.textfs
     fs:SetText(ns.UI.RichText.Format(node.text or ""))
     fs:SetTextColor(T.text_warm[1], T.text_warm[2], T.text_warm[3], 1)
 
@@ -643,14 +710,18 @@ local function renderTable(content, y, node)
         local rowTop = y
         local cmd, desc = row[1] or "", row[2] or ""
 
-        local L = track(content, content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall"))
+        local L = acquire("table.L", function()
+            return content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        end)
         L:SetPoint("TOPLEFT", content, "TOPLEFT", READER_PAD_SIDE, rowTop)
         L:SetWidth(leftW)
         L:SetJustifyH("LEFT")
         L:SetWordWrap(true); L:SetNonSpaceWrap(false)
         L:SetText("|cffffd100" .. cmd .. "|r")
 
-        local R = track(content, content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall"))
+        local R = acquire("table.R", function()
+            return content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        end)
         R:SetPoint("TOPLEFT", content, "TOPLEFT", READER_PAD_SIDE + leftW + gutter, rowTop)
         R:SetWidth(rightW)
         R:SetJustifyH("LEFT")
@@ -659,7 +730,9 @@ local function renderTable(content, y, node)
 
         local h = math.max(L:GetStringHeight(), R:GetStringHeight()) + 6
 
-        local rule = track(content, content:CreateTexture(nil, "ARTWORK"))
+        local rule = acquire("table.rule", function()
+            return content:CreateTexture(nil, "ARTWORK")
+        end)
         rule:SetTexture("Interface\\Buttons\\WHITE8x8")
         rule:SetVertexColor(T.stone_rim[1], T.stone_rim[2], T.stone_rim[3], 0.4)
         rule:SetHeight(1)
@@ -828,12 +901,17 @@ local function buildReader(parent)
     sf:SetScrollChild(content)
 
     -- If the pane's width changes after BuildInto (e.g., Window-size dropdown),
-    -- reflow the content width on the next OnSizeChanged event.
-    parent:HookScript("OnSizeChanged", function(_, w)
-        if not w or w <= 0 then return end
-        local nw = w - RAIL_W - SCROLLBAR_PAD - SCROLLBAR_W
-        if nw > 0 then content:SetWidth(nw) end
-    end)
+    -- reflow the content width on the next OnSizeChanged event. HookScript
+    -- cannot be un-hooked, so guard with a flag: if BuildInto ever runs twice
+    -- the handler would otherwise stack.
+    if not parent._helpHooked then
+        parent._helpHooked = true
+        parent:HookScript("OnSizeChanged", function(_, w)
+            if not w or w <= 0 then return end
+            local nw = w - RAIL_W - SCROLLBAR_PAD - SCROLLBAR_W
+            if nw > 0 then content:SetWidth(nw) end
+        end)
+    end
 
     _readerContent, _readerScroll = content, sf
     return reader
@@ -848,54 +926,60 @@ function ns.UI.Tabs.Help.SetChapter(id)
     end
     if not ch then return end
 
-    if _readerContent._spawned then
-        for _, r in ipairs(_readerContent._spawned) do
-            r:Hide()
-            r:ClearAllPoints()
-        end
-    end
-    _readerContent._spawned = {}
+    -- Rewind every region pool so this render reuses regions instead of
+    -- creating new ones. The masthead regions below are pooled too.
+    poolReset()
 
+    local content = _readerContent
     local y = -READER_PAD_TOP
 
-    local eye = _readerContent:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    eye:SetPoint("TOPLEFT", _readerContent, "TOPLEFT", READER_PAD_SIDE, y)
+    local eye = acquire("head.eye", function()
+        return content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    end)
+    eye:SetPoint("TOPLEFT", content, "TOPLEFT", READER_PAD_SIDE, y)
     eye:SetText(ch.eyebrow or "")
     eye:SetTextColor(T.gold_rim[1], T.gold_rim[2], T.gold_rim[3], 1)
-    table.insert(_readerContent._spawned, eye)
     y = y - 14
 
-    local h1 = _readerContent:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-    h1:SetPoint("TOPLEFT", _readerContent, "TOPLEFT", READER_PAD_SIDE, y)
+    local h1 = acquire("head.h1", function()
+        return content:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+    end)
+    h1:SetPoint("TOPLEFT", content, "TOPLEFT", READER_PAD_SIDE, y)
     h1:SetText(ch.title)
     h1:SetTextColor(T.gold[1], T.gold[2], T.gold[3], 1)
-    table.insert(_readerContent._spawned, h1)
     y = y - 30
 
-    -- Masthead sub-line only on the intro chapter (per spec §4.3).
+    -- Masthead sub-line only on the intro chapter (per spec §4.3). Pooled like
+    -- the rest; poolHideUnused hides it on chapters that don't render it.
     if ch.id == "intro" then
-        local sub = _readerContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        sub:SetPoint("TOPLEFT", _readerContent, "TOPLEFT", READER_PAD_SIDE, y)
+        local sub = acquire("head.sub", function()
+            return content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        end)
+        sub:SetPoint("TOPLEFT", content, "TOPLEFT", READER_PAD_SIDE, y)
         sub:SetText("raid commander \194\183 WarStormBot UI \194\183 v" ..
             (GetAddOnMetadata("Warden", "Version") or "?"))
         sub:SetTextColor(T.gold_rim[1], T.gold_rim[2], T.gold_rim[3], 1)
-        table.insert(_readerContent._spawned, sub)
         y = y - 16
     end
 
-    local rule = _readerContent:CreateTexture(nil, "ARTWORK")
+    local rule = acquire("head.rule", function()
+        return content:CreateTexture(nil, "ARTWORK")
+    end)
     rule:SetTexture("Interface\\Buttons\\WHITE8x8")
     rule:SetVertexColor(T.gold_rim[1], T.gold_rim[2], T.gold_rim[3], 0.5)
     rule:SetHeight(1)
-    rule:SetPoint("TOPLEFT", _readerContent, "TOPLEFT", READER_PAD_SIDE, y)
-    rule:SetPoint("RIGHT",   _readerContent, "RIGHT",   -READER_PAD_SIDE, 0)
-    table.insert(_readerContent._spawned, rule)
+    rule:SetPoint("TOPLEFT", content, "TOPLEFT", READER_PAD_SIDE, y)
+    rule:SetPoint("RIGHT",   content, "RIGHT",   -READER_PAD_SIDE, 0)
     y = y - 14
 
     for _, node in ipairs(ch.body or {}) do
         local fn = DISPATCH[node.kind]
         if fn then y = fn(_readerContent, y, node) end
     end
+
+    -- Hide any pooled regions the previous (busier) chapter used but this one
+    -- didn't, so leftovers never render on top of the new chapter.
+    poolHideUnused()
 
     _readerContent:SetHeight(math.max(10, -y + READER_PAD_BOT))
     if _readerScroll then _readerScroll:SetVerticalScroll(0) end

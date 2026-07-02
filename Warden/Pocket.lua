@@ -501,85 +501,56 @@ local function buildTradePanel(parent)
 
     -- "accept" button (#3): SecureActionButtonTemplate because AcceptTrade()
     -- is protected and can only be called from a hardware click context.
-    -- Unique global name per call so docked + float panels don't collide.
-    ns._pocketAcceptBtnCount = (ns._pocketAcceptBtnCount or 0) + 1
-    local whisperAccept = CreateFrame("Button",
-        "WardenPocketAcceptBtn" .. ns._pocketAcceptBtnCount, p,
-        "SecureActionButtonTemplate")
-    whisperAccept:SetSize(60, 22)
-    whisperAccept:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -8, 8)
-    whisperAccept:RegisterForClicks("LeftButtonUp")
-    whisperAccept:EnableMouse(true)
-    whisperAccept:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    whisperAccept:SetBackdropColor(TOK.stone_tile[1], TOK.stone_tile[2], TOK.stone_tile[3], 1)
-    whisperAccept:SetBackdropBorderColor(TOK.gold_rim[1], TOK.gold_rim[2], TOK.gold_rim[3], 1)
-    local accLbl = whisperAccept:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    accLbl:SetPoint("CENTER", whisperAccept, "CENTER", 0, 0)
-    accLbl:SetText("accept")
-    accLbl:SetTextColor(TOK.gold[1], TOK.gold[2], TOK.gold[3], 1)
-    whisperAccept:SetFontString(accLbl)
-    local accHi = whisperAccept:CreateTexture(nil, "HIGHLIGHT")
-    accHi:SetTexture("Interface\\Buttons\\WHITE8x8")
-    accHi:SetAllPoints(whisperAccept)
-    accHi:SetBlendMode("ADD")
-    accHi:SetVertexColor(1, 1, 1, 0.10)
-    whisperAccept:SetHighlightTexture(accHi)
+    -- Named frames are never GC'd in WoW, so we create ONE secure button per
+    -- panel slot (docked vs. float) and cache it on the namespace, reusing it
+    -- across panel rebuilds instead of minting a fresh global name each call.
+    -- The slot key is derived from whether we're building the docked panel
+    -- (parented under the Pocket frame) or the float; both get a stable name.
+    local btnName = (parent == state.frame)
+        and "WardenPocketAcceptBtn" or "WardenPocketAcceptBtnFloat"
+    local whisperAccept = _G[btnName]
+    if not whisperAccept then
+        whisperAccept = CreateFrame("Button", btnName, p, "SecureActionButtonTemplate")
+        whisperAccept:EnableMouse(true)
+        whisperAccept:SetBackdrop({
+            bgFile   = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        whisperAccept:SetBackdropColor(TOK.stone_tile[1], TOK.stone_tile[2], TOK.stone_tile[3], 1)
+        whisperAccept:SetBackdropBorderColor(TOK.gold_rim[1], TOK.gold_rim[2], TOK.gold_rim[3], 1)
+        local accLbl = whisperAccept:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        accLbl:SetPoint("CENTER", whisperAccept, "CENTER", 0, 0)
+        accLbl:SetText("accept")
+        accLbl:SetTextColor(TOK.gold[1], TOK.gold[2], TOK.gold[3], 1)
+        whisperAccept:SetFontString(accLbl)
+        local accHi = whisperAccept:CreateTexture(nil, "HIGHLIGHT")
+        accHi:SetTexture("Interface\\Buttons\\WHITE8x8")
+        accHi:SetAllPoints(whisperAccept)
+        accHi:SetBlendMode("ADD")
+        accHi:SetVertexColor(1, 1, 1, 0.10)
+        whisperAccept:SetHighlightTexture(accHi)
 
-    -- Macro-based secure dispatch: WoW's /click chat slash is allowed to
-    -- click protected buttons (TradeFrameAcceptButton -> AcceptTrade) when
-    -- run from a SecureActionButton's macrotext attribute. This is the
-    -- standard 3.3.5 pattern for invoking protected functions from addons.
-    whisperAccept:SetAttribute("type", "macro")
-    whisperAccept:SetAttribute("macrotext", "/click TradeFrameAcceptButton")
-    -- Also register all buttons to ensure any modifier-combo click reaches
-    -- the secure dispatch (some 3.3.5 builds require explicit registration).
-    whisperAccept:RegisterForClicks("AnyUp", "AnyDown")
+        -- Macro-based secure dispatch: WoW's /click chat slash is allowed to
+        -- click protected buttons (TradeFrameAcceptButton -> AcceptTrade) when
+        -- run from a SecureActionButton's macrotext attribute. This is the
+        -- standard 3.3.5 pattern for invoking protected functions from addons.
+        whisperAccept:SetAttribute("type", "macro")
+        whisperAccept:SetAttribute("macrotext", "/click TradeFrameAcceptButton")
+        -- Also register all buttons to ensure any modifier-combo click reaches
+        -- the secure dispatch (some 3.3.5 builds require explicit registration).
+        whisperAccept:RegisterForClicks("AnyUp", "AnyDown")
+    end
+    -- Reparent + reposition on every (re)build so the cached button attaches
+    -- to the current panel instance.
+    whisperAccept:SetParent(p)
+    whisperAccept:SetSize(60, 22)
+    whisperAccept:ClearAllPoints()
+    whisperAccept:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -8, 8)
     p.whisperAccept = whisperAccept
 
-    -- DEBUG LOGGERS: print everything we can observe so the user can paste
-    -- the chat output back. Remove these once the root cause is identified.
-    whisperAccept:HookScript("OnClick", function(self, btnKind, isDown)
-        local target = resolveTarget() or "?"
-        ns.MsgInfo(string.format("DBG[accept]: OnClick fired btn=%s down=%s target=%s",
-            tostring(btnKind), tostring(isDown), target))
-        ns.MsgInfo(string.format("DBG[accept]: type=%s macrotext=%s clickbutton=%s",
-            tostring(self:GetAttribute("type")),
-            tostring(self:GetAttribute("macrotext")),
-            tostring(self:GetAttribute("clickbutton"))))
-        ns.MsgInfo(string.format("DBG[accept]: TradeFrameAcceptButton exists=%s, _G has it=%s",
-            tostring(TradeFrameAcceptButton ~= nil),
-            tostring(_G["TradeFrameAcceptButton"] ~= nil)))
-        ns.MsgInfo(string.format("DBG[accept]: TradeFrame shown=%s, InCombatLockdown=%s",
-            tostring(TradeFrame and TradeFrame:IsShown()),
-            tostring(InCombatLockdown())))
-        local mySlot   = type(GetTradePlayerItemLink) == "function" and GetTradePlayerItemLink(1) or nil
-        local botMoney = type(GetTargetTradeMoney) == "function" and (GetTargetTradeMoney() or 0) or 0
-        ns.MsgInfo(string.format("DBG[accept]: mySlot=%s botMoney=%d",
-            tostring(mySlot), botMoney))
-        -- Try a direct AcceptTrade call too, just to see what happens
-        -- (expected to silently fail because protected from non-hardware
-        -- context — but if WarStorm relaxed protection, this might work):
-        if type(AcceptTrade) == "function" then
-            local ok, err = pcall(AcceptTrade)
-            ns.MsgInfo(string.format("DBG[accept]: pcall(AcceptTrade)=%s err=%s",
-                tostring(ok), tostring(err)))
-        end
-        -- Last-ditch: try clicking the native button via its Click() method
-        -- (also protected, also expected to fail outside secure context):
-        if TradeFrameAcceptButton and TradeFrameAcceptButton.Click then
-            local ok, err = pcall(function() TradeFrameAcceptButton:Click() end)
-            ns.MsgInfo(string.format("DBG[accept]: pcall(:Click())=%s err=%s",
-                tostring(ok), tostring(err)))
-        end
-    end)
-
-    -- armAccept is now a no-op kept for back-compat with TRADE_SHOW handler;
-    -- /click resolves the button at click time so no runtime arming needed.
-    p.armAccept = function() end
+    -- /click resolves TradeFrameAcceptButton at click time, so no runtime
+    -- arming needed.
 
     return p
 end
@@ -714,21 +685,15 @@ local TRADE_PLAYER_SLOTS = 6
 -- Returns an array {{bag, slot, count}, ...} for every stack of `link`.
 local function findAllItemStacks(link)
     if type(link) ~= "string" then
-        ns.MsgInfo("DBG[stacks]: link is not a string, got type " .. type(link))
         return {}
     end
     local wantId = link:match("|Hitem:(%d+)")
     if not wantId then
-        ns.MsgInfo("DBG[stacks]: no itemId found in link: " .. tostring(link))
         return {}
     end
     local results = {}
-    local scannedBags = 0
-    local scannedSlots = 0
     for bag = 0, 4 do
         local n = (GetContainerNumSlots and GetContainerNumSlots(bag)) or 0
-        scannedBags = scannedBags + 1
-        scannedSlots = scannedSlots + n
         for slot = 1, n do
             local l = GetContainerItemLink and GetContainerItemLink(bag, slot)
             if l then
@@ -742,12 +707,6 @@ local function findAllItemStacks(link)
                 end
             end
         end
-    end
-    ns.MsgInfo(string.format("DBG[stacks]: scanned %d bags / %d slots, found %d stack(s) of itemId %s",
-        scannedBags, scannedSlots, #results, wantId))
-    for i, s in ipairs(results) do
-        ns.MsgInfo(string.format("DBG[stacks]:   #%d  bag=%d slot=%d count=%d",
-            i, s.bag, s.slot, s.count))
     end
     return results
 end
@@ -785,11 +744,8 @@ end
 -- total item count actually placed (sum of stack counts placed).
 local function autoPlaceAllStacks()
     if not state.item or state.item == "" then
-        ns.MsgInfo("DBG[place]: state.item empty, nothing to place")
         return 0, 0
     end
-    ns.MsgInfo(string.format("DBG[place]: state.item = %s",
-        state.item:match("|h%[(.-)%]|h") or state.item))
     local stacks = findAllItemStacks(state.item)
     if #stacks == 0 then
         ns.MsgWarn("Pocket: item not found in bags (auto-place skipped).")
@@ -799,16 +755,12 @@ local function autoPlaceAllStacks()
     local placedSlots = 0
     for i, s in ipairs(stacks) do
         if i > TRADE_PLAYER_SLOTS then
-            ns.MsgInfo(string.format("DBG[place]: hit 6-slot cap at stack #%d", i))
             break
         end
         -- Skip slots already filled (user may have manually placed items).
         local already = type(GetTradePlayerItemLink) == "function"
                         and GetTradePlayerItemLink(i) or nil
-        if already then
-            ns.MsgInfo(string.format("DBG[place]: trade slot %d already filled (%s), skipping",
-                i, tostring(already)))
-        else
+        if not already then
             if type(ClearCursor) == "function" then ClearCursor() end
             if type(PickupContainerItem) == "function" then
                 PickupContainerItem(s.bag, s.slot)
@@ -818,15 +770,12 @@ local function autoPlaceAllStacks()
             end
             placedCount = placedCount + s.count
             placedSlots = placedSlots + 1
-            ns.MsgInfo(string.format("DBG[place]: placed stack #%d (bag=%d slot=%d count=%d) on trade slot %d",
-                i, s.bag, s.slot, s.count, i))
         end
     end
     if #stacks > TRADE_PLAYER_SLOTS then
         ns.MsgWarn(string.format("Pocket: %d stacks in bag but only 6 trade slots — %d stack(s) left behind.",
             #stacks, #stacks - TRADE_PLAYER_SLOTS))
     end
-    ns.MsgInfo(string.format("DBG[place]: TOTAL placedCount=%d placedSlots=%d", placedCount, placedSlots))
     return placedCount, placedSlots
 end
 
@@ -917,13 +866,6 @@ local function ensureListener()
                 dockTradePanel()
             else
                 showTradeFloat()
-            end
-            -- Arm the secure accept button now that TradeFrame is loaded.
-            if state.tradePanel and state.tradePanel.armAccept then
-                state.tradePanel.armAccept()
-            end
-            if tradeFloat and tradeFloat._panel and tradeFloat._panel.armAccept then
-                tradeFloat._panel.armAccept()
             end
             -- If the trade was kicked off from our "trade" button (or from
             -- auto-proximity), auto-place the item AND whisper the price.

@@ -171,59 +171,18 @@ local refreshTargetLine, refreshActionMode, refreshStatus, refreshBanner
 -- UI build
 -- ----------------------------------------------------------
 local function buildHeader(parent)
-    local h = CreateFrame("Frame", nil, parent)
-    h:SetHeight(HEADER_H)
-    h:SetPoint("TOPLEFT",  parent, "TOPLEFT",  0, 0)
-    h:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 0)
-
-    local title = h:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("LEFT", h, "LEFT", PAD, 0)
-    title:SetText("WARDENSHIELD")
-    title:SetTextColor(GOLD[1], GOLD[2], GOLD[3], 1)
-
-    local hint = h:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetPoint("LEFT", title, "RIGHT", 6, 0)
-    hint:SetText("/wsh")
-    hint:SetTextColor(0.55, 0.50, 0.42, 1)
-
-    local close = CreateFrame("Button", nil, h)
-    close:SetSize(16, 16)
-    close:SetPoint("RIGHT", h, "RIGHT", -PAD, 0)
-    local cfs = close:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    cfs:SetPoint("CENTER", close, "CENTER", 0, 0)
-    cfs:SetText("x")
-    cfs:SetTextColor(0.85, 0.18, 0.12, 1)
-    close:SetScript("OnClick", function() ns.Shield.Hide() end)
-
-    local lock = CreateFrame("Button", nil, h)
-    lock:SetSize(16, 16)
-    lock:SetPoint("RIGHT", close, "LEFT", -4, 0)
-    local lfs = lock:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    lfs:SetPoint("CENTER", lock, "CENTER", 0, 0)
-    lock.fs = lfs
-    lock:SetScript("OnClick", function() ns.Shield.ToggleLock() end)
-    h.lockBtn = lock
-
-    local rule = h:CreateTexture(nil, "ARTWORK")
-    rule:SetTexture("Interface\\Buttons\\WHITE8x8")
-    rule:SetVertexColor(STONE_RIM[1], STONE_RIM[2], STONE_RIM[3], 1)
-    rule:SetHeight(1)
-    rule:SetPoint("BOTTOMLEFT",  h, "BOTTOMLEFT",  0, 0)
-    rule:SetPoint("BOTTOMRIGHT", h, "BOTTOMRIGHT", 0, 0)
-    return h
+    return ns.UI.HudChrome.BuildHeader(parent, {
+        title   = "WARDENSHIELD", hint = "/wsh",
+        height  = HEADER_H, pad = PAD, gold = GOLD, rim = STONE_RIM,
+        onClose = function() ns.Shield.Hide() end,
+        onLock  = function() ns.Shield.ToggleLock() end,
+    })
 end
 
 local function refreshLockGlyph()
     local h = state.frame and state.frame.header
-    if not h or not h.lockBtn or not h.lockBtn.fs then return end
     local s = shieldDB()
-    if s and s.locked then
-        h.lockBtn.fs:SetText("*")
-        h.lockBtn.fs:SetTextColor(GOLD[1], GOLD[2], GOLD[3], 1)
-    else
-        h.lockBtn.fs:SetText("o")
-        h.lockBtn.fs:SetTextColor(0.55, 0.50, 0.42, 1)
-    end
+    ns.UI.HudChrome.SetLockGlyph(h and h.lockBtn, s and s.locked, GOLD)
 end
 
 refreshTargetLine = function()
@@ -846,7 +805,10 @@ local function ensureListener()
     if not listenerFrame then
         listenerFrame = CreateFrame("Frame", "WardenShieldListener")
     end
-    listenerFrame:RegisterEvent("CHAT_MSG_WHISPER")
+    -- PLAYER_TARGET_CHANGED stays registered for the whole session: caston mode
+    -- captures the target independently of any capture window. CHAT_MSG_WHISPER
+    -- is *not* registered here - it is armed/disarmed around capture windows only
+    -- (see armWhisper/disarmWhisper) so idle whispers never reach this handler.
     listenerFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
     listenerFrame:SetScript("OnEvent", function(_, event, text, sender)
         if event == "PLAYER_TARGET_CHANGED" then
@@ -891,6 +853,20 @@ local function ensureListener()
     state.listenerArmed = true
 end
 
+-- Arm/disarm the whisper feed around capture windows only. Outside a capture
+-- there is nothing to collect, so we keep CHAT_MSG_WHISPER unregistered rather
+-- than fire the handler (and guard-return) on every unrelated whisper.
+local function armWhisper()
+    ensureListener()
+    listenerFrame:RegisterEvent("CHAT_MSG_WHISPER")
+end
+
+local function disarmWhisper()
+    if listenerFrame then
+        listenerFrame:UnregisterEvent("CHAT_MSG_WHISPER")
+    end
+end
+
 -- 0.2 s ticker that just repaints the countdown banner. Self-disarms when
 -- the capture window closes; re-armed by startCapture().
 local countdownFrame
@@ -906,6 +882,7 @@ local function armCountdown()
         if state.captureUntil == 0 or GetTime() > state.captureUntil then
             state.captureUntil = 0
             self:SetScript("OnUpdate", nil)
+            disarmWhisper()   -- window closed: stop listening for whispers
             if ns.DebugF then
                 ns.DebugF("shield", "capture closed (%d lines)", #state.lines)
             end
@@ -970,7 +947,7 @@ local function startCapture(mode)
             name, tostring(classTok), tostring(mode), sec)
     end
 
-    ensureListener()
+    armWhisper()
     armCountdown()
     SendChatMessage(mode, "WHISPER", nil, name)
     ns.MsgInfo(string.format("`%s` -> %s (listening %ds)", mode, name, sec))
@@ -981,22 +958,15 @@ end
 -- Frame build
 -- ----------------------------------------------------------
 local function applyPosition()
-    if not state.frame then return end
     local s = shieldDB()
-    state.frame:ClearAllPoints()
-    if s and s.pos and type(s.pos) == "table" and s.pos.point then
-        state.frame:SetPoint(s.pos.point, UIParent, s.pos.point,
-            s.pos.x or 0, s.pos.y or 0)
-    else
-        state.frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -40, -380)
-    end
+    ns.UI.HudChrome.ApplyPosition(state.frame, s and s.pos,
+        { point = "TOPRIGHT", x = -40, y = -380 })
 end
 
 local function storePosition()
-    if not state.frame then return end
     local s = shieldDB(); if not s then return end
-    local point, _, _, x, y = state.frame:GetPoint(1)
-    if point then s.pos = { point = point, x = x, y = y } end
+    local pos = ns.UI.HudChrome.ReadPosition(state.frame)
+    if pos then s.pos = pos end
 end
 
 -- Layout pass: re-anchor the action row, mode row, conditional widgets, and
@@ -1466,6 +1436,7 @@ function ns.Shield.ResetPosition()
 end
 
 function ns.Shield.Clear()
+    disarmWhisper()   -- unlocking the target ends any open capture
     state.mode         = nil
     state.captureUntil = 0
     state.target       = nil

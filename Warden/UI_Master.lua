@@ -335,6 +335,9 @@ local function buildFrame()
 
     footer._accum = 0
     footer:SetScript("OnUpdate", function(self, elapsed)
+        -- Skip refresh while the Warden window is closed (self is the footer,
+        -- parented to the main frame, so it's not visible when the window is).
+        if not self:IsVisible() then return end   -- skip while the window is closed
         self._accum = (self._accum or 0) + elapsed
         if self._accum < 0.5 then return end
         self._accum = 0

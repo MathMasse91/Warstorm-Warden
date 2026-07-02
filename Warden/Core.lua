@@ -714,6 +714,116 @@ function ns.UI.Segmented.Create(parent, items, onChange)
 end
 
 -- =====================================================================
+-- HudChrome: shared chrome for the floating HUDs (WardenSword, WardenShield,
+-- WardenMantle). These three HUDs had byte-identical header/lock/position code
+-- copy-pasted into each file; this collapses it into one parameterized helper
+-- so a tweak to the title bar or the save/restore logic lands in all three.
+-- The per-HUD differences (title text, /slash hint, close & lock callbacks,
+-- accent colors, default anchor) are all passed in as options.
+-- =====================================================================
+ns.UI.HudChrome = ns.UI.HudChrome or {}
+
+local GOLD_DEFAULT = { 1.00, 0.82, 0.00 }   -- title + locked glyph
+local RIM_DEFAULT  = { 0.23, 0.18, 0.13 }   -- bottom divider rule
+local HINT_DIM     = { 0.55, 0.50, 0.42 }   -- /slash hint + unlocked glyph
+
+-- Build the standard HUD title bar: title + /slash hint on the left, a lock
+-- toggle and a red close "x" on the right, and a 1px divider underneath.
+-- opts = {
+--   title, hint,                    -- required text
+--   onClose, onLock,                -- required OnClick handlers
+--   height (default 22), pad (8),   -- geometry
+--   gold, rim,                      -- optional accent color overrides {r,g,b}
+-- }
+-- Returns the header frame; the lock button is exposed as header.lockBtn
+-- (with header.lockBtn.fs) so SetLockGlyph can repaint it later.
+function ns.UI.HudChrome.BuildHeader(parent, opts)
+    local pad  = opts.pad or 8
+    local gold = opts.gold or GOLD_DEFAULT
+    local rim  = opts.rim  or RIM_DEFAULT
+
+    local h = CreateFrame("Frame", nil, parent)
+    h:SetHeight(opts.height or 22)
+    h:SetPoint("TOPLEFT",  parent, "TOPLEFT",  0, 0)
+    h:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 0)
+
+    local title = h:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    title:SetPoint("LEFT", h, "LEFT", pad, 0)
+    title:SetText(opts.title)
+    title:SetTextColor(gold[1], gold[2], gold[3], 1)
+
+    local hint = h:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("LEFT", title, "RIGHT", 6, 0)
+    hint:SetText(opts.hint)
+    hint:SetTextColor(HINT_DIM[1], HINT_DIM[2], HINT_DIM[3], 1)
+
+    -- Close X (red glyph) on the far right.
+    local close = CreateFrame("Button", nil, h)
+    close:SetSize(16, 16)
+    close:SetPoint("RIGHT", h, "RIGHT", -pad, 0)
+    local cfs = close:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    cfs:SetPoint("CENTER", close, "CENTER", 0, 0)
+    cfs:SetText("x")
+    cfs:SetTextColor(0.85, 0.18, 0.12, 1)
+    close:SetScript("OnClick", opts.onClose)
+
+    -- Lock toggle just left of close (open/closed glyph, painted by SetLockGlyph).
+    local lock = CreateFrame("Button", nil, h)
+    lock:SetSize(16, 16)
+    lock:SetPoint("RIGHT", close, "LEFT", -4, 0)
+    local lfs = lock:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    lfs:SetPoint("CENTER", lock, "CENTER", 0, 0)
+    lock.fs = lfs
+    lock:SetScript("OnClick", opts.onLock)
+    h.lockBtn = lock
+
+    -- Divider line under the header.
+    local rule = h:CreateTexture(nil, "ARTWORK")
+    rule:SetTexture("Interface\\Buttons\\WHITE8x8")
+    rule:SetVertexColor(rim[1], rim[2], rim[3], 1)
+    rule:SetHeight(1)
+    rule:SetPoint("BOTTOMLEFT",  h, "BOTTOMLEFT",  0, 0)
+    rule:SetPoint("BOTTOMRIGHT", h, "BOTTOMRIGHT", 0, 0)
+    return h
+end
+
+-- Repaint a lock button's glyph: locked = filled "*" in gold, unlocked = ring
+-- "o" in dim. Safe to call with a nil button. `gold` overrides the locked color.
+function ns.UI.HudChrome.SetLockGlyph(lockBtn, locked, gold)
+    if not lockBtn or not lockBtn.fs then return end
+    gold = gold or GOLD_DEFAULT
+    if locked then
+        lockBtn.fs:SetText("*")
+        lockBtn.fs:SetTextColor(gold[1], gold[2], gold[3], 1)
+    else
+        lockBtn.fs:SetText("o")
+        lockBtn.fs:SetTextColor(HINT_DIM[1], HINT_DIM[2], HINT_DIM[3], 1)
+    end
+end
+
+-- Restore a HUD frame to its saved anchor, or fall back to a default.
+-- pos = saved { point, x, y } (may be nil); def = default { point, x, y }.
+-- Anchors point-to-same-point against UIParent, matching the old per-HUD code.
+function ns.UI.HudChrome.ApplyPosition(frame, pos, def)
+    if not frame then return end
+    frame:ClearAllPoints()
+    if pos and type(pos) == "table" and pos.point then
+        frame:SetPoint(pos.point, UIParent, pos.point, pos.x or 0, pos.y or 0)
+    else
+        frame:SetPoint(def.point, UIParent, def.point, def.x or 0, def.y or 0)
+    end
+end
+
+-- Read a HUD frame's current anchor into { point, x, y }, or nil if it has no
+-- point. Callers should only overwrite their saved pos when this is non-nil.
+function ns.UI.HudChrome.ReadPosition(frame)
+    if not frame then return nil end
+    local point, _, _, x, y = frame:GetPoint(1)
+    if point then return { point = point, x = x, y = y } end
+    return nil
+end
+
+-- =====================================================================
 -- RichText: parse inline markers used by the Help tab content table.
 -- Three markers, none nesting:
 --   |kbd[F]|         -> gold keycap escape

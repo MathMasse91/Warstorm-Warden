@@ -9,9 +9,16 @@ local _, ns = ...
 ns.UI.Tabs          = ns.UI.Tabs          or {}
 ns.UI.Tabs.Settings = ns.UI.Tabs.Settings or {}
 
+local built = false
+
 function ns.UI.Tabs.Settings.BuildInto(pane)
+    -- Idempotency guard: a 2nd call would recreate every ScrollFrame/panel/
+    -- checkbox (clobbering named globals) and stack a duplicate OnUpdate.
+    if built then return end
+
     local db = ns.Persistence.DB
     if not db then return end
+    built = true  -- only latch once we've committed to building (db present)
 
     local paneW, paneH = pane:GetWidth(), pane:GetHeight()
 
@@ -113,8 +120,22 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     local whisperP = ns.UI.Panel.Create(content, contentW - 16, 236, "Bot whisper filter")
     whisperP:SetPoint("TOPLEFT", globalP, "BOTTOMLEFT", 0, -6)
 
-    mkCheck(whisperP.content, "Block bot noise whispers", 4, -2, "whisperFilter",
-        "Master switch. Hides the whispers WarStorm playerbots spam - walk-by \"invite me\" lines and your own bots' \"Equipping\"/\"Staying\" acks. Real players are never touched; a bot must be a bot, and the invite lines only apply to senders outside your group.")
+    -- Everything below the master switch (warning note, "LINES TO HIDE"
+    -- label, and the per-line checkboxes) is only meaningful once the filter
+    -- is on, so it is shown/hidden as a block by syncWhisperLines().
+    local whisperKids = {}
+    local function syncWhisperLines()
+        local on = db.whisperFilter == true
+        for _, w in ipairs(whisperKids) do
+            if on then w:Show() else w:Hide() end
+        end
+    end
+
+    ns.UI.Check.Make(whisperP.content, "WardenSetting_whisperFilter",
+        "Block bot noise whispers", db, "whisperFilter",
+        { tip = "Master switch. Hides the whispers WarStorm playerbots spam - walk-by \"invite me\" lines and your own bots' \"Equipping\"/\"Staying\" acks. Real players are never touched; a bot must be a bot, and the invite lines only apply to senders outside your group.",
+          onToggle = syncWhisperLines })
+        :SetPoint("TOPLEFT", whisperP.content, "TOPLEFT", 4, -2)
 
     local whispWarn = whisperP.content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     whispWarn:SetPoint("TOPLEFT", whisperP.content, "TOPLEFT",  6, -26)
@@ -123,19 +144,24 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     whispWarn:SetWordWrap(true)
     whispWarn:SetText("|cffffaa00Note:|r a real player could in theory whisper one of these exact lines. Untick any line below to keep it visible. Party/raid members are never affected by the invite lines.")
     whispWarn:SetTextColor(0.85, 0.72, 0.4, 1)
+    table.insert(whisperKids, whispWarn)
 
     local linesLbl = whisperP.content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     linesLbl:SetPoint("TOPLEFT", whisperP.content, "TOPLEFT", 4, -64)
     linesLbl:SetText("LINES TO HIDE")
     linesLbl:SetTextColor(0.72, 0.58, 0.21, 1)
+    table.insert(whisperKids, linesLbl)
 
     local wy = -82
     for _, p in ipairs(ns.WhisperBlocker and ns.WhisperBlocker.PATTERNS or {}) do
         local cb = ns.UI.Check.Make(whisperP.content, "WardenSetting_wf_" .. p.key,
             p.label, db.whisperFilters, p.key, { echo = false })
         cb:SetPoint("TOPLEFT", whisperP.content, "TOPLEFT", 8, wy)
+        table.insert(whisperKids, cb)
         wy = wy - 22
     end
+
+    syncWhisperLines()  -- apply initial visibility from the saved setting
 
     -- ============================================================
     -- Panel 2 - Session stats (PATCH_NOTES §13a: 3-col grid instead of a
@@ -184,6 +210,8 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
 
     pane._statsAccum = 0
     pane:SetScript("OnUpdate", function(self, elapsed)
+        -- Skip polling while the Settings tab is hidden (self is the pane).
+        if not self:IsVisible() then return end   -- skip while tab/window is hidden
         self._statsAccum = (self._statsAccum or 0) + elapsed
         if self._statsAccum < 0.5 then return end
         self._statsAccum = 0

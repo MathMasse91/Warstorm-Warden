@@ -73,61 +73,20 @@ local function resolveTarget()
 end
 
 -- ----------------------------------------------------------
--- Header (clone of WardenSword's, retitled)
+-- Header: shared HUD chrome (see ns.UI.HudChrome in Core), retitled for Mantle.
 -- ----------------------------------------------------------
 local function refreshLockButton(lockBtn)
     local s = mt()
-    if not lockBtn or not lockBtn.fs then return end
-    if s and s.locked then
-        lockBtn.fs:SetText("*")
-        lockBtn.fs:SetTextColor(1.00, 0.82, 0.00, 1)
-    else
-        lockBtn.fs:SetText("o")
-        lockBtn.fs:SetTextColor(0.55, 0.50, 0.42, 1)
-    end
+    ns.UI.HudChrome.SetLockGlyph(lockBtn, s and s.locked)
 end
 
 local function buildHeader(parent)
-    local h = CreateFrame("Frame", nil, parent)
-    h:SetHeight(HEADER_H)
-    h:SetPoint("TOPLEFT",  parent, "TOPLEFT",  0, 0)
-    h:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 0)
-
-    local title = h:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("LEFT", h, "LEFT", PAD, 0)
-    title:SetText("WARDEN MANTLE")
-    title:SetTextColor(1.00, 0.82, 0.00, 1)
-
-    local hint = h:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetPoint("LEFT", title, "RIGHT", 6, 0)
-    hint:SetText("/wm")
-    hint:SetTextColor(0.55, 0.50, 0.42, 1)
-
-    local close = CreateFrame("Button", nil, h)
-    close:SetSize(16, 16)
-    close:SetPoint("RIGHT", h, "RIGHT", -PAD, 0)
-    local cfs = close:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    cfs:SetPoint("CENTER", close, "CENTER", 0, 0)
-    cfs:SetText("x")
-    cfs:SetTextColor(0.85, 0.18, 0.12, 1)
-    close:SetScript("OnClick", function() ns.WardenMantle.Hide() end)
-
-    local lock = CreateFrame("Button", nil, h)
-    lock:SetSize(16, 16)
-    lock:SetPoint("RIGHT", close, "LEFT", -4, 0)
-    local lfs = lock:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    lfs:SetPoint("CENTER", lock, "CENTER", 0, 0)
-    lock.fs = lfs
-    lock:SetScript("OnClick", function() ns.WardenMantle.ToggleLock() end)
-    h.lockBtn = lock
-
-    local rule = h:CreateTexture(nil, "ARTWORK")
-    rule:SetTexture("Interface\\Buttons\\WHITE8x8")
-    rule:SetVertexColor(0.23, 0.18, 0.13, 1)
-    rule:SetHeight(1)
-    rule:SetPoint("BOTTOMLEFT",  h, "BOTTOMLEFT",  0, 0)
-    rule:SetPoint("BOTTOMRIGHT", h, "BOTTOMRIGHT", 0, 0)
-    return h
+    return ns.UI.HudChrome.BuildHeader(parent, {
+        title   = "WARDEN MANTLE", hint = "/wm",
+        height  = HEADER_H, pad = PAD,
+        onClose = function() ns.WardenMantle.Hide() end,
+        onLock  = function() ns.WardenMantle.ToggleLock() end,
+    })
 end
 
 -- ----------------------------------------------------------
@@ -477,21 +436,15 @@ ns.WardenMantle.Refresh = Refresh
 -- Position
 -- ----------------------------------------------------------
 local function applyPosition()
-    if not frame then return end
     local s = mt()
-    frame:ClearAllPoints()
-    if s and s.pos and type(s.pos) == "table" and s.pos.point then
-        frame:SetPoint(s.pos.point, UIParent, s.pos.point, s.pos.x or 0, s.pos.y or 0)
-    else
-        frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -300, -120)
-    end
+    ns.UI.HudChrome.ApplyPosition(frame, s and s.pos,
+        { point = "TOPRIGHT", x = -300, y = -120 })
 end
 
 local function storePosition()
-    if not frame then return end
     local s = mt(); if not s then return end
-    local point, _, _, x, y = frame:GetPoint(1)
-    if point then s.pos = { point = point, x = x, y = y } end
+    local pos = ns.UI.HudChrome.ReadPosition(frame)
+    if pos then s.pos = pos end
 end
 
 -- ----------------------------------------------------------

@@ -376,20 +376,22 @@ local LAYOUT_10_MM = {
     [10] = slot("SHAMAN",      "resto pve",  "healing"),
 }
 
+-- Shallow-copy a layout table then override individual slots with freshly
+-- built slot() tables. Never shares sub-table references between variants,
+-- so mutating one derived comp can't corrupt its base or its siblings.
+local function deriveLayout(base, overrides)
+    local out = {}
+    for idx, s in pairs(base) do out[idx] = s end
+    for idx, s in pairs(overrides) do out[idx] = s end
+    return out
+end
+
 -- ICC 10: survival hunter (better AoE trash, consistent uptime on Lich King).
--- Same role-grouped layout as the MM template, but the Hunter is surv.
-local LAYOUT_10_ICC = {
-    [1]  = slot("DEATHKNIGHT", "blood pve"),
-    [2]  = slot("PALADIN",     "prot pve",   "sanctuary", "devotion"),
-    [3]  = slot("PALADIN",     "ret pve",    "might",     "retribution"),
-    [4]  = slot("ROGUE",       "combat pve"),
-    [5]  = slot("HUNTER",      "surv pve",   "aotw"),
-    [6]  = slot("MAGE",        "fire pve"),
-    [7]  = slot("WARLOCK",     "demo pve"),
-    [8]  = slot("PALADIN",     "holy pve",   "kings",     "concentration"),
-    [9]  = slot("PRIEST",      "disc pve",   nil,         "shadow res"),
-    [10] = slot("SHAMAN",      "resto pve",  "healing"),
-}
+-- Same role-grouped layout as the MM template, but the Hunter (slot 5) is surv.
+-- Derived from LAYOUT_10_MM by overriding only that single slot.
+local LAYOUT_10_ICC = deriveLayout(LAYOUT_10_MM, {
+    [5] = slot("HUNTER", "surv pve", "aotw"),
+})
 
 -- 25-man layouts differ only in which Hunter carries Aspect of the Wild
 -- (mm in the MM variant, surv in the SURV variant). Everything else is
@@ -430,39 +432,13 @@ local LAYOUT_25_MM = {
 
 -- SURV variant: Ulduar 25 and Icecrown Citadel 25 (AoE + nature-res-heavy
 -- content — surv hunter provides the aura, mm stays secondary). Same
--- role-grouped layout as the MM variant; only the Hunter aura assignment
--- differs (surv carries aotw, mm has none).
-local LAYOUT_25_SURV = {
-    -- Tanks (G1 slot 1-4)
-    [1]  = slot("DEATHKNIGHT", "blood pve"),
-    [2]  = slot("DRUID",       "bear pve"),
-    [3]  = slot("PALADIN",     "prot pve",  "sanctuary", "devotion"),
-    [4]  = slot("PALADIN",     "prot pve",  "sanctuary", "devotion"),
-    -- Melee (G1 slot 5, G2 slot 6-11)
-    [5]  = slot("DEATHKNIGHT", "frost pve"),
-    [6]  = slot("PALADIN",     "ret pve",   "might",     "retribution"),
-    [7]  = slot("ROGUE",       "combat pve"),
-    [8]  = slot("ROGUE",       "combat pve"),
-    [9]  = slot("SHAMAN",      "enh pve",   "melee"),
-    [10] = slot("WARRIOR",     "fury pve",  "battle"),
-    [11] = slot("WARRIOR",     "arms pve",  "commanding"),
-    -- Ranged (G3 slot 12-15, G4 slot 16-20)
-    [12] = slot("DRUID",       "balance pve"),
-    [13] = slot("HUNTER",      "surv pve",  "aotw"),
-    [14] = slot("HUNTER",      "mm pve"),
-    [15] = slot("MAGE",        "fire pve"),
-    [16] = slot("MAGE",        "fire pve"),
-    [17] = slot("PRIEST",      "shadow pve"),
-    [18] = slot("SHAMAN",      "ele pve",   "caster"),
-    [19] = slot("WARLOCK",     "demo pve"),
-    [20] = slot("WARLOCK",     "affli pve"),
-    -- Healers (G5 slot 21-25)
-    [21] = slot("DRUID",       "resto pve"),
-    [22] = slot("PALADIN",     "holy pve",  "kings",     "concentration"),
-    [23] = slot("PRIEST",      "disc pve",  nil,         "shadow res"),
-    [24] = slot("PRIEST",      "holy pve"),
-    [25] = slot("SHAMAN",      "resto pve", "healing"),
-}
+-- role-grouped layout as the MM variant; only the two Hunter slots (13/14)
+-- swap so aotw rides the surv hunter instead of the mm one. Derived from
+-- LAYOUT_25_MM by overriding just those two slots.
+local LAYOUT_25_SURV = deriveLayout(LAYOUT_25_MM, {
+    [13] = slot("HUNTER", "surv pve", "aotw"),
+    [14] = slot("HUNTER", "mm pve"),
+})
 
 -- 5-man layout. Role-grouped: tank → melee → ranged → heal, alphabetical
 -- by class within each role.

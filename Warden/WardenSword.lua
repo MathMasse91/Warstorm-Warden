@@ -68,60 +68,17 @@ end
 -- Frame construction
 -- ----------------------------------------------------------
 local function buildHeader(parent, width)
-    local h = CreateFrame("Frame", nil, parent)
-    h:SetHeight(HEADER_H)
-    h:SetPoint("TOPLEFT",  parent, "TOPLEFT",  0, 0)
-    h:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 0)
-
-    local title = h:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    title:SetPoint("LEFT", h, "LEFT", PAD, 0)
-    title:SetText("WARDENSWORD")
-    title:SetTextColor(1.00, 0.82, 0.00, 1)
-    local hint = h:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetPoint("LEFT", title, "RIGHT", 6, 0)
-    hint:SetText("/ws")
-    hint:SetTextColor(0.55, 0.50, 0.42, 1)
-
-    -- Close X (red glyph) on the far right.
-    local close = CreateFrame("Button", nil, h)
-    close:SetSize(16, 16)
-    close:SetPoint("RIGHT", h, "RIGHT", -PAD, 0)
-    local cfs = close:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    cfs:SetPoint("CENTER", close, "CENTER", 0, 0)
-    cfs:SetText("x")
-    cfs:SetTextColor(0.85, 0.18, 0.12, 1)
-    close:SetScript("OnClick", function() ns.WardenSword.Hide() end)
-
-    -- Lock toggle just left of close. Open/closed circle glyph.
-    local lock = CreateFrame("Button", nil, h)
-    lock:SetSize(16, 16)
-    lock:SetPoint("RIGHT", close, "LEFT", -4, 0)
-    local lfs = lock:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    lfs:SetPoint("CENTER", lock, "CENTER", 0, 0)
-    lock.fs = lfs
-    lock:SetScript("OnClick", function() ns.WardenSword.ToggleLock() end)
-    h.lockBtn = lock
-
-    -- Divider line under the header
-    local rule = h:CreateTexture(nil, "ARTWORK")
-    rule:SetTexture("Interface\\Buttons\\WHITE8x8")
-    rule:SetVertexColor(0.23, 0.18, 0.13, 1)
-    rule:SetHeight(1)
-    rule:SetPoint("BOTTOMLEFT",  h, "BOTTOMLEFT",  0, 0)
-    rule:SetPoint("BOTTOMRIGHT", h, "BOTTOMRIGHT", 0, 0)
-    return h
+    return ns.UI.HudChrome.BuildHeader(parent, {
+        title   = "WARDENSWORD", hint = "/ws",
+        height  = HEADER_H, pad = PAD,
+        onClose = function() ns.WardenSword.Hide() end,
+        onLock  = function() ns.WardenSword.ToggleLock() end,
+    })
 end
 
 local function refreshLockButton(lockBtn)
     local s = sw()
-    if not lockBtn or not lockBtn.fs then return end
-    if s and s.locked then
-        lockBtn.fs:SetText("*")
-        lockBtn.fs:SetTextColor(1.00, 0.82, 0.00, 1)
-    else
-        lockBtn.fs:SetText("o")
-        lockBtn.fs:SetTextColor(0.55, 0.50, 0.42, 1)
-    end
+    ns.UI.HudChrome.SetLockGlyph(lockBtn, s and s.locked)
 end
 
 local function buildStatusStrip(parent)
@@ -392,24 +349,18 @@ local function layout()
 end
 
 local function applyPosition()
-    if not frame then return end
     local s = sw()
-    frame:ClearAllPoints()
-    if s and s.pos and type(s.pos) == "table" and s.pos.point then
-        frame:SetPoint(s.pos.point, UIParent, s.pos.point, s.pos.x or 0, s.pos.y or 0)
-    else
-        -- Default: upper-right of the screen so the HUD does not spawn
-        -- inside the main /warden window (which made right-column buttons
-        -- look hidden behind it on first load).
-        frame:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -40, -120)
-    end
+    -- Default: upper-right of the screen so the HUD does not spawn inside the
+    -- main /warden window (which made right-column buttons look hidden behind
+    -- it on first load).
+    ns.UI.HudChrome.ApplyPosition(frame, s and s.pos,
+        { point = "TOPRIGHT", x = -40, y = -120 })
 end
 
 local function storePosition()
-    if not frame then return end
     local s = sw(); if not s then return end
-    local point, _, _, x, y = frame:GetPoint(1)
-    if point then s.pos = { point = point, x = x, y = y } end
+    local pos = ns.UI.HudChrome.ReadPosition(frame)
+    if pos then s.pos = pos end
 end
 
 local function build()

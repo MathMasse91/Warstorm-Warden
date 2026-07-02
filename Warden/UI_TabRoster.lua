@@ -787,6 +787,8 @@ function ns.UI.Tabs.Roster.BuildInto(pane)
 
     frame._auraAccum = 0
     frame:SetScript("OnUpdate", function(self, elapsed)
+        -- Skip while the Roster tab is hidden (self is the pane/frame).
+        if not self:IsVisible() then return end   -- skip while tab/window is hidden
         if not dirty then return end
         self._auraAccum = (self._auraAccum or 0) + elapsed
         if self._auraAccum < 0.5 then return end

@@ -98,6 +98,8 @@ local tabState = {
     historyMax   = 6,
 }
 
+local built = false
+
 -- ----------------------------------------------------------
 -- Target history (targeting the same player twice doesn't duplicate)
 -- ----------------------------------------------------------
@@ -401,6 +403,11 @@ end
 -- BuildInto
 -- ----------------------------------------------------------
 function ns.UI.Tabs.Spec.BuildInto(pane)
+    -- Idempotency guard: a 2nd call would recreate every widget; the
+    -- tabState.targetEvents check further down only guards the event frame.
+    if built then return end
+    built = true
+
     tabState.pane = pane
     local paneW = pane:GetWidth()
     local paneH = pane:GetHeight()

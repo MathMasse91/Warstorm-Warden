@@ -1495,6 +1495,56 @@ local function refreshPresetDropdown()
 end
 
 -- ----------------------------------------------------------
+-- Build/Create kickoff + their confirm popups (file scope).
+-- Both popups take the plan at click-time via StaticPopup_Show's data arg (like
+-- WARDEN_COMP_RENAME above), so they need no upvalues into the BuildInto
+-- closure and are defined once here instead of being rebuilt on every
+-- BuildInto call. runBuild lives here too so the Build button's OnClick and the
+-- confirm popup share the exact same logic.
+-- ----------------------------------------------------------
+local function runBuild(plan)
+    -- BUG-#4: if the user placed the [P] (isPlayer) slot in e.g. group 3
+    -- (caster group) but the player is currently in group 1, bots spawn into G1
+    -- first and push the caster group off by one. Fix: move the player to the
+    -- target subgroup BEFORE queuing spawns. `plan.playerTargetGroup` is set by
+    -- readPlan when a [P] slot exists. Two paths:
+    --   (a) already in raid -> MovePlayerToGroup runs now, inline.
+    --   (b) party -> raid via StartBuild -> ConvertToRaid: the raid doesn't
+    --       exist yet, so MovePlayerToGroup here no-ops; StartBuild schedules a
+    --       deferred MovePlayerToGroup after ConvertToRaid has propagated.
+    if plan.playerTargetGroup and ns.Engine and ns.Engine.MovePlayerToGroup then
+        ns.Engine.MovePlayerToGroup(plan.playerTargetGroup)
+    end
+    ns.Engine.StartBuild(plan)
+end
+
+-- Safe-summon guard: clicking Build while already in a group/raid kicks off the
+-- add/remove churn of StartBuild over your live roster, which can wipe a raid on
+-- a stray click. Confirm first. (data carries the plan; OnAccept receives it as
+-- the 2nd arg.)
+StaticPopupDialogs["WARDEN_CONFIRM_BUILD"] = {
+    text         = "You're already in a group/raid.\nBuild will re-summon bots over the current roster. Proceed?",
+    button1      = YES, button2 = NO, timeout = 0,
+    whileDead    = true, hideOnEscape = true,
+    OnAccept     = function(_, data) runBuild(data) end,
+}
+
+-- Create: one-click ORC-style sequence - remove ALL current bots, paced
+-- re-summon of this comp (auto-converts to raid + auto-specs + AI strats), then
+-- per-bot init=epic, autogear, and world buffs. Destructive, so always behind a
+-- confirm.
+StaticPopupDialogs["WARDEN_CONFIRM_CREATE"] = {
+    text         = "Create raid:\nremoves ALL current bots, re-summons this comp, gears them (init=epic + autogear) and applies world buffs. Proceed?",
+    button1      = YES, button2 = NO, timeout = 0,
+    whileDead    = true, hideOnEscape = true,
+    OnAccept     = function(_, data)
+        if ns.Engine and ns.Engine.CreateRaid then
+            ns.Engine.CreateRaid(data, { initRarity = "epic" })
+        end
+    end,
+}
+
+-- ----------------------------------------------------------
 -- BuildInto
 -- ----------------------------------------------------------
 function ns.UI.Tabs.Comp.BuildInto(pane)
@@ -1725,42 +1775,8 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     filledCap:SetText("filled")
     filledCap:SetTextColor(0.61, 0.55, 0.40)
 
-    -- runBuild: the actual build kickoff, factored out of the click handler
-    -- so both the direct path and the safe-summon confirmation popup can run
-    -- the exact same logic.
-    local function runBuild(plan)
-        -- BUG-#4: if the user placed the [P] (isPlayer) slot in e.g.
-        -- group 3 (caster group) but the player is currently in group 1,
-        -- bots spawn into G1 first and push the caster group off by one.
-        -- Fix: move the player to the target subgroup BEFORE queuing
-        -- spawns. `plan.playerTargetGroup` is set by readPlan when a
-        -- [P] slot exists. Two paths:
-        --   (a) already in raid -> MovePlayerToGroup runs now, inline.
-        --   (b) party -> raid via StartBuild -> ConvertToRaid: the raid
-        --       doesn't exist yet, so MovePlayerToGroup here no-ops.
-        --       StartBuild schedules a deferred MovePlayerToGroup after
-        --       ConvertToRaid has propagated.
-        if plan.playerTargetGroup and ns.Engine and ns.Engine.MovePlayerToGroup then
-            ns.Engine.MovePlayerToGroup(plan.playerTargetGroup)
-        end
-
-        ns.Engine.StartBuild(plan)
-    end
-
-    -- Safe-summon guard: clicking Build while already in a group/raid kicks
-    -- off the add/remove churn of StartBuild over your live roster, which can
-    -- wipe a raid on a stray click. Confirm first - mirrors the prompt the
-    -- competing addon shows on its "Create" button. (data carries the plan;
-    -- OnAccept receives it as the 2nd arg, same pattern WoW uses elsewhere.)
-    StaticPopupDialogs["WARDEN_CONFIRM_BUILD"] = {
-        text         = "You're already in a group/raid.\nBuild will re-summon bots over the current roster. Proceed?",
-        button1      = YES, button2 = NO, timeout = 0,
-        whileDead    = true, hideOnEscape = true,
-        OnAccept     = function(_, data) runBuild(data) end,
-    }
-
     -- buildBtn itself is created in the bottom action row (see below); its
-    -- click handler reuses runBuild + WARDEN_CONFIRM_BUILD defined here.
+    -- click handler reuses runBuild + WARDEN_CONFIRM_BUILD defined at file scope.
     state.sidebar.summary = { numLbl = numLbl }
 
     -- ----------------------------------------------------------
@@ -2148,16 +2164,7 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     -- auto-moves the player to their [P] slot.
     local createBtn = ns.UI.Button.red(pane, "Create", ACT_BTN_W, ACT_BTN_H)
     createBtn:SetPoint("RIGHT", stopBtn, "LEFT", -ACT_GAP, 0)
-    StaticPopupDialogs["WARDEN_CONFIRM_CREATE"] = {
-        text         = "Create raid:\nremoves ALL current bots, re-summons this comp, gears them (init=epic + autogear) and applies world buffs. Proceed?",
-        button1      = YES, button2 = NO, timeout = 0,
-        whileDead    = true, hideOnEscape = true,
-        OnAccept     = function(_, data)
-            if ns.Engine and ns.Engine.CreateRaid then
-                ns.Engine.CreateRaid(data, { initRarity = "epic" })
-            end
-        end,
-    }
+    -- WARDEN_CONFIRM_CREATE popup is defined at file scope (see above).
     createBtn:SetScript("OnClick", function()
         local plan = readPlan()
         if #plan == 0 then ns.MsgErr("Grid is empty - nothing to create."); return end

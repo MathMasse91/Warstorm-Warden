@@ -21,6 +21,20 @@ function ns.Engine.IsLeader()
     return false
 end
 
+-- Party -> raid auto-convert guard, shared verbatim by StartBuild, the roster
+-- watcher, and the completer tick. Caller passes the resolved `autoRaid` flag
+-- and `buildFitsInParty`; every other term is evaluated live here so all three
+-- sites test the identical condition. ConvertToRaid is protected and silently
+-- fails in combat, hence the InCombatLockdown() guard.
+local function shouldConvertToRaid(autoRaid, buildFitsInParty)
+    return autoRaid
+       and not buildFitsInParty
+       and not ns.Engine.IsInRaid()
+       and GetNumPartyMembers() > 0
+       and ns.Engine.IsLeader()
+       and not InCombatLockdown()
+end
+
 -- ----------------------------------------------------------
 -- Engine state
 -- ----------------------------------------------------------
@@ -316,12 +330,7 @@ function ns.Engine.StartBuild(plan)
 
     local db = ns.Persistence.DB
     local autoRaid = db and db.autoRaidDuringBuild ~= false
-    if autoRaid
-       and not s.buildFitsInParty
-       and not ns.Engine.IsInRaid()
-       and GetNumPartyMembers() > 0
-       and ns.Engine.IsLeader()
-       and not InCombatLockdown() then
+    if shouldConvertToRaid(autoRaid, s.buildFitsInParty) then
         ConvertToRaid()
     end
 
@@ -673,12 +682,7 @@ watcher:SetScript("OnEvent", function()
     -- Also respect `s.buildFitsInParty` so a 5-man comp (4 bots + player)
     -- stays in party mode - the setting is a "convert when needed", not
     -- a "convert always".
-    if db and db.autoRaidDuringBuild ~= false
-       and not s.buildFitsInParty
-       and not ns.Engine.IsInRaid()
-       and GetNumPartyMembers() > 0
-       and ns.Engine.IsLeader()
-       and not InCombatLockdown() then
+    if shouldConvertToRaid(db and db.autoRaidDuringBuild ~= false, s.buildFitsInParty) then
         ConvertToRaid()
         DEFAULT_CHAT_FRAME:AddMessage(
             "|cff00ff00[Warden]|r Party converted to raid.")
@@ -807,12 +811,7 @@ local function completerTick(self, elapsed)
     -- path was missing.
     do
         local db = ns.Persistence.DB
-        if db and db.autoRaidDuringBuild ~= false
-           and not s.buildFitsInParty
-           and not ns.Engine.IsInRaid()
-           and GetNumPartyMembers() > 0
-           and ns.Engine.IsLeader()
-           and not InCombatLockdown() then
+        if shouldConvertToRaid(db and db.autoRaidDuringBuild ~= false, s.buildFitsInParty) then
             ConvertToRaid()
             if ns.LogF then ns.LogF("completer: timed ConvertToRaid fallback fired") end
         end
