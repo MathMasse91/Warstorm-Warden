@@ -91,6 +91,17 @@ function ns.Engine.QueueDepth()
     return #ns.Engine.state.sendQueue
 end
 
+-- Un-throttled one-shot send. For single, user-driven Mantle actions (RB
+-- re-roll, Autogear) that must fire INSTANTLY - a lone command can't trip the
+-- server anti-spam that the sendQueue throttle guards against. Keeps the
+-- no-direct-SendChatMessage invariant by routing through Engine.
+function ns.Engine.SendNow(msg, channel, target)
+    if type(msg) ~= "string" or msg == "" then return end
+    local db = ns.Persistence and ns.Persistence.DB
+    SendChatMessage(msg, channel or (db and db.commandChannel) or "SAY", nil, target)
+    if ns.LogF then ns.LogF("SendNow: '%s' -> %s", msg, channel or "SAY") end
+end
+
 -- ----------------------------------------------------------
 -- Send-queue ticker - drains sendQueue at DB.interval. Self-disarms when
 -- idle so we aren't dispatched every frame during normal play.

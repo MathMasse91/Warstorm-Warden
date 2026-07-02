@@ -309,14 +309,15 @@ local function buildBody()
 
     local ag = ns.UI.Button.gold(frame, "Autogear", 60, 18)
     ag:SetScript("OnClick", function()
-        ns.Engine.Queue("autogear", "PARTY")
+        ns.Engine.SendNow("autogear", "PARTY")
         ns.MsgInfo("Sent `autogear` -> PARTY.")
     end)
     frame.autogear = ag
 
     -- Bot-gear re-roll: rarity dropdown + compact RB button. RB re-rolls bot
     -- gear via `.warstormbot bot init=<rarity>` on the command channel - routed
-    -- through Engine.Queue so the no-direct-SendChatMessage invariant holds.
+    -- through Engine.SendNow (un-throttled: fires INSTANTLY, keeps the
+    -- no-direct-SendChatMessage invariant).
     -- The label is dropped (the rarity + RB tooltip carry the meaning).
     local rarityDrop = CreateFrame("Frame", "WardenMantleRarityDrop", frame, "UIDropDownMenuTemplate")
     ns.UI.Dropdown.style(rarityDrop, 96)
@@ -341,7 +342,7 @@ local function buildBody()
     resetBtn:SetScript("OnClick", function()
         local chan = (db() and db().commandChannel) or "SAY"
         local rarity = initRarity or "epic"
-        ns.Engine.Queue(".warstormbot bot init=" .. rarity, chan)
+        ns.Engine.SendNow(".warstormbot bot init=" .. rarity, chan)
         ns.MsgInfo(string.format("Sent `.warstormbot bot init=%s` (%s).", rarity, chan))
     end)
     ns.UI.Tooltip.Attach(resetBtn, "Reset Bot gear",
