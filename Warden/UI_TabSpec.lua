@@ -699,11 +699,9 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     local levelBtn = ns.UI.Button.gold(cardPanel.content, "Re-gear Bots", 90, 20)
     levelBtn:SetPoint("TOPRIGHT", rarityDrop, "BOTTOMRIGHT", -16, 0)
     levelBtn:SetScript("OnClick", function()
-        local db     = ns.Persistence and ns.Persistence.DB
-        local chan   = (db and db.commandChannel) or "SAY"
-        local rarity = ns.Persistence.GetInitRarity()
-        ns.Engine.SendNow(".warstormbot bot init=" .. rarity, chan)
-        ns.MsgInfo(string.format("Sent `.warstormbot bot init=%s` (%s).", rarity, chan))
+        -- Per-bot `init=<rarity> <name> <spec>`: keeps each tracked bot's
+        -- spec (a bare init re-rolls a random one).
+        ns.Engine.InitBots(ns.Persistence.GetInitRarity())
     end)
 
     -- U9 tooltips for the action row + bot-init control.
@@ -713,7 +711,7 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     tip(autogearBtn, "Autogear", "Broadcasts `autogear` to your group: every bot equips its best gear.", "ANCHOR_TOP")
     tip(buffsBtn, "World Buffs", "Broadcasts `nc +worldbuff` to your group.", "ANCHOR_TOP")
     tip(levelBtn, "Re-gear bots",
-        "Sends `.warstormbot bot init=<rarity>` (rarity from the dropdown, remembered): re-rolls every bot's gear AND talents - re-spec afterwards.",
+        "Sends `.warstormbot bot init=<rarity> <name> <spec>` to every bot (rarity from the dropdown, remembered): re-gears at that rarity and keeps each bot's tracked spec. Untracked bots get a random spec. Don't Autogear after: it re-gears at epic.",
         "ANCHOR_TOP")
 
     -- ============================================================

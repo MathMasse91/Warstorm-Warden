@@ -71,7 +71,7 @@ That's how **Warden v1.0.0** happened. 👍
 - **Coverage panel** — a raid-grid table of buff tiles that light green when provided and stay dim-red when missing, so gaps read at a glance
 - Consolidated **action bar** along the bottom: FILE row (save / load / import / export / delete / clear / cleanup / rename) up top, and the **Build · Create · Stop Build** group with the live Queue/Pending status below
 - `[P]` flag = real player (never touched)
-- **Create** (one click): removes all bots, re-summons the comp, gear-inits each bot at your saved rarity, *then* applies specs + strategies (init re-rolls talents), then autogear, Bloodlust/Heroism off, Fortitude / Gift of the Wild / Spirit and a warlock soulstone on you — order and buffs by **Feryll/Huntriss [DGEN]**
+- **Create** (one click): removes all bots, re-summons the comp, inits each bot with `init=<rarity> <name> <spec>` (gear at your saved rarity **and** its spec in one command), then strategies, Bloodlust/Heroism off, Fortitude / Gift of the Wild / Spirit and a warlock soulstone on you — order and buffs by **Feryll/Huntriss [DGEN]**
 - **To Chat**: post the comp as readable text to Raid / Party / Guild / Officer / Say / Yell / BG — by **Feryll/Huntriss [DGEN]**
 - Paladin auras are held in combat too (`nc` + `co`), warrior shouts are locked to the one you picked (`ss` by spell ID)
 
@@ -128,7 +128,7 @@ A small floating **spec-swap HUD** (successor to feysSpecManager) for whatever b
 - **Target line** — portrait + class-colored name + spec count of the current target (or "No Target")
 - **Spec tiles** — `PvE` and `PvP` rows of the target's specs (label sits inline to the left; icons stay a fixed size even for the druid's 4 PvE specs). Click a tile to whisper `talents spec <spec>` to that bot. The swap is recorded by GUID, so a Comp-tab Re-Spec re-applies it after a retarget
 - **Summon** — whispers `summon` straight to the *targeted* bot, so that specific bot comes to you (not a party-wide call) · **Autogear** — runs the autogear pass on the party
-- **Rarity + RB** — pick a gear rarity (Common / Uncommon / Rare / Epic), then hit **RB** (*Reset Bot* — hover for the full tooltip) to send `.warstormbot bot init=<rarity>`, re-rolling bot gear at that quality
+- **Rarity + RB** — pick a gear rarity (Common / Uncommon / Rare / Epic), then hit **RB** (*Reset Bot* — hover for the full tooltip) to send `.warstormbot bot init=<rarity> <name> <spec>`, re-gearing the bot at that quality while keeping its tracked spec
 - Draggable / lockable, position persists across `/reload`
 - Mantle whispers fire **instantly** (un-throttled) — you drive it one bot at a time, so there's no flood risk. The mass build / Re-Spec paths stay throttled to respect the server's whisper mute
 

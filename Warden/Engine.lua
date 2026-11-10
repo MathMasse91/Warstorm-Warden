@@ -967,17 +967,36 @@ function ns.Engine.CancelTimers()
 end
 
 -- ----------------------------------------------------------
--- Public API: InitBots - per-named-bot gear/init.
--- Sends `.warstormbot bot init=<rarity> <name>` for every bot in the current
--- group (skips the player and any human-flagged names), throttled through the
--- send queue so a 25-man init doesn't blast the server in one frame. Unlike
--- the global `init=<rarity>` (no name), this targets each bot individually -
--- matching how the bot core applies gear per character. Returns the count.
+-- Public API: InitCommand / InitBots - per-named-bot gear + spec init.
+-- `.warstormbot bot init=<rarity> <name> <spec>` gears the bot at <rarity>
+-- AND applies <spec> server-side in one command. Without the spec the server
+-- re-rolls a random spec, and a later `autogear` re-gears at the server's
+-- quality cap (epic) - so rarity + spec only stick when sent together.
 -- ----------------------------------------------------------
-function ns.Engine.InitBots(rarity)
+function ns.Engine.InitCommand(rarity, name, spec)
     rarity = (type(rarity) == "string" and rarity ~= "" and rarity) or "epic"
-    local pattern = ".warstormbot bot init=" .. rarity .. " %s"
-    local n = 0
+    local cmd = ".warstormbot bot init=" .. rarity
+    if type(name) == "string" and name ~= "" then
+        cmd = cmd .. " " .. name
+        if type(spec) == "string" and spec ~= "" then cmd = cmd .. " " .. spec end
+    end
+    return cmd
+end
+
+-- Spec Warden knows for a unit: tracked assignment (by GUID) first.
+local function trackedSpec(unit)
+    local guid = UnitGUID(unit)
+    local a = guid and ns.Engine.state.assignedSpecs[guid]
+    return a and a.spec or nil
+end
+
+-- Queues one init per bot in the group (skips the player and human-flagged
+-- names), throttled through the send queue so a 25-man init doesn't blast
+-- the server in one frame. specByName (optional) overrides the spec per
+-- bot name; otherwise the tracked spec is used, else a bare init (random
+-- spec). Returns (count, countWithSpec).
+function ns.Engine.InitBots(rarity, specByName)
+    local n, withSpec = 0, 0
     local function consider(unit)
         if not UnitExists(unit) or not UnitIsPlayer(unit) then return end
         if UnitIsUnit(unit, "player") then return end
@@ -985,8 +1004,10 @@ function ns.Engine.InitBots(rarity)
         if not name then return end
         if ns.Persistence and ns.Persistence.IsPlayerName
            and ns.Persistence.IsPlayerName(name) then return end
-        ns.Engine.Queue(string.format(pattern, name))  -- drains on the command channel
+        local spec = (specByName and specByName[name]) or trackedSpec(unit)
+        ns.Engine.Queue(ns.Engine.InitCommand(rarity, name, spec))  -- command channel
         n = n + 1
+        if spec then withSpec = withSpec + 1 end
     end
     if ns.Engine.IsInRaid() then
         for i = 1, GetNumRaidMembers() do consider("raid" .. i) end
@@ -994,19 +1015,22 @@ function ns.Engine.InitBots(rarity)
         for i = 1, GetNumPartyMembers() do consider("party" .. i) end
     end
     DEFAULT_CHAT_FRAME:AddMessage(string.format(
-        "|cff00ff00[Warden]|r Init: queued init=%s for %d bot(s).", rarity, n))
-    if ns.LogF then ns.LogF("InitBots: queued init=%s for %d bots", rarity, n) end
-    return n
+        "|cff00ff00[Warden]|r Init: queued init=%s for %d bot(s) (%d with spec).",
+        tostring(rarity), n, withSpec))
+    if ns.LogF then ns.LogF("InitBots: queued init=%s for %d bots (%d with spec)", tostring(rarity), n, withSpec) end
+    return n, withSpec
 end
 
 -- ----------------------------------------------------------
 -- Public API: CreateRaid - the one-click "Create" sequence.
 -- Order (init-first, from Feryll/Huntriss [DGEN]): remove all bots -> paced
 -- StartBuild in deferSpecs mode (bots are only recorded as they join) ->
--- on completion: per-bot gear init -> once the init queue has drained and the
--- server had INIT_SETTLE seconds, whisper every spec + strategy -> once those
--- whispers drain: autogear, Bloodlust/Heroism excluded, group buffs, soulstone,
--- world buffs. Specs go out AFTER init because init re-rolls talents.
+-- on completion: per-bot `init=<rarity> <name> <spec>` (gear + spec in one
+-- server command) -> once the init queue has drained and the server had
+-- INIT_SETTLE seconds, whisper every bot's strategies -> once those drain:
+-- Bloodlust/Heroism excluded, group buffs, soulstone, world buffs.
+-- No `talents spec` whisper (init applied it) and no `autogear` (it would
+-- re-gear at the server's epic cap and undo a lower rarity).
 -- If some bots never joined, the build still completes on BUILD_TIMEOUT and
 -- the chain runs for the bots that did. opts = { initRarity = "epic" | nil }.
 -- ----------------------------------------------------------
@@ -1031,9 +1055,7 @@ local function afterSendDrained(extra, fn)
 end
 
 local function finishCreate(hasClass)
-    ns.Broadcast("autogear")
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Warden]|r Create: sent autogear.")
-    ns.Engine.After(2.0, function()
+    ns.Engine.After(1.0, function()
         -- Bloodlust/Heroism off by default; the BL toggle turns it back on.
         if hasClass.SHAMAN then ns.Engine.SetBloodlust(false) end
         if hasClass.PRIEST then ns.Broadcast("@priest cast " .. PRAYER_OF_FORTITUDE_ID) end
@@ -1078,15 +1100,27 @@ function ns.Engine.CreateRaid(plan, opts)
             if item.classToken then hasClass[item.classToken] = true end
         end
 
-        local rarity = opts.initRarity
-        if rarity then ns.Engine.InitBots(rarity) end
+        local specByName = {}
+        for _, item in ipairs(items) do specByName[item.name] = item.spec end
+        ns.Engine.InitBots(opts.initRarity or "epic", specByName)
 
-        afterSendDrained(rarity and INIT_SETTLE or 0, function()
+        afterSendDrained(INIT_SETTLE, function()
+            -- Spec came with init; only the strategy chasers remain.
+            local n = 0
+            for _, item in ipairs(items) do
+                if item.classToken and ns.Data and ns.Data.BuildStratCommands then
+                    for _, cmd in ipairs(ns.Data.BuildStratCommands(
+                            item.classToken, item.opt1, item.opt2, item.spec)) do
+                        ns.Engine.PushWhisper({ name = item.name, strat = cmd })
+                        n = n + 1
+                    end
+                end
+            end
             DEFAULT_CHAT_FRAME:AddMessage(string.format(
-                "|cff00ff00[Warden]|r Create: whispering %d spec(s).", #items))
-            if #items == 0 then finishCreate(hasClass); return end
+                "|cff00ff00[Warden]|r Create: %d bot(s) inited with spec, %d strategy whisper(s).",
+                #items, n))
+            if n == 0 then finishCreate(hasClass); return end
             s.onWhispersDrained = function() finishCreate(hasClass) end
-            for _, item in ipairs(items) do ns.Engine.PushWhisper(item) end
         end)
     end
 

@@ -334,13 +334,21 @@ local function buildBody()
     -- card's footprint; the full meaning shows in a hover tooltip.
     local resetBtn = ns.UI.Button.gold(frame, "RB", 30, 20)
     resetBtn:SetScript("OnClick", function()
-        local chan = (db() and db().commandChannel) or "SAY"
         local rarity = ns.Persistence.GetInitRarity()
-        ns.Engine.SendNow(".warstormbot bot init=" .. rarity, chan)
-        ns.MsgInfo(string.format("Sent `.warstormbot bot init=%s` (%s).", rarity, chan))
+        local name, _, guid = resolveTarget()
+        if not name then
+            ns.Engine.InitBots(rarity)  -- no bot targeted: whole group
+            return
+        end
+        -- Gear + spec in one command; without the spec the server re-rolls it.
+        local a = guid and ns.Engine.state.assignedSpecs[guid]
+        local cmd = ns.Engine.InitCommand(rarity, name, a and a.spec)
+        local chan = (db() and db().commandChannel) or "SAY"
+        ns.Engine.SendNow(cmd, chan)
+        ns.MsgInfo(string.format("Sent `%s` (%s).", cmd, chan))
     end)
-    ns.UI.Tooltip.Attach(resetBtn, "Re-gear bots",
-        "Sends `.warstormbot bot init=<rarity>` (rarity from the dropdown, remembered): re-rolls the targeted / all bots' gear AND talents - click a spec tile afterwards.",
+    ns.UI.Tooltip.Attach(resetBtn, "Re-gear bot",
+        "Sends `.warstormbot bot init=<rarity> <name> <spec>` to the targeted bot (rarity from the dropdown, remembered; spec = its tracked spec). No target: every bot. Don't Autogear after: it re-gears at epic.",
         "ANCHOR_TOP")
     frame.resetBtn = resetBtn
 end

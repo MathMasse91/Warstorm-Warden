@@ -1583,12 +1583,12 @@ StaticPopupDialogs["WARDEN_CONFIRM_BUILD"] = {
 }
 
 -- Create: one-click ORC-style sequence - remove ALL current bots, paced
--- re-summon of this comp, per-bot gear init at the saved rarity, THEN specs +
--- AI strats (init re-rolls talents), then autogear, BL off, group buffs and
--- world buffs (init-first order from Feryll/Huntriss [DGEN]). Destructive, so
+-- re-summon of this comp, per-bot `init=<rarity> <name> <spec>` (gear + spec
+-- in one server command), then AI strats, BL off, group buffs and world
+-- buffs - no autogear (it would re-gear at the server's epic cap) (init-first order from Feryll/Huntriss [DGEN]). Destructive, so
 -- always behind a confirm.
 StaticPopupDialogs["WARDEN_CONFIRM_CREATE"] = {
-    text         = "Create raid:\nremoves ALL current bots, re-summons this comp, gears them (init=%s), specs them, then autogear + buffs. Proceed?",
+    text         = "Create raid:\nremoves ALL current bots, re-summons this comp, gears + specs them (init=%s), then strategies + buffs. Proceed?",
     button1      = YES, button2 = NO, timeout = 0,
     whileDead    = true, hideOnEscape = true,
     OnAccept     = function(_, data)
@@ -2283,8 +2283,8 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     end)
 
     -- Create: one-click ORC-style sequence - remove ALL current bots, paced
-    -- re-summon of this comp, gear init at the saved rarity, then specs + AI
-    -- strats, autogear and buffs (see CreateRaid). Destructive, so it's
+    -- re-summon of this comp, gear + spec init at the saved rarity, then AI
+    -- strats and buffs (see CreateRaid). Destructive, so it's
     -- always behind a confirm. NOTE: a full role-based raid re-sort is not part
     -- of this chain yet (that's the separate sort feature); the build still
     -- auto-moves the player to their [P] slot.
