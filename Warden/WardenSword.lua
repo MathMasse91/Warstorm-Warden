@@ -364,6 +364,10 @@ local function storePosition()
     if pos then s.pos = pos end
 end
 
+-- Session-only: true after the user closes the HUD, so auto-show on combat
+-- start doesn't reopen it.
+local dismissed = false
+
 local function build()
     if frame then return frame end
     frame = CreateFrame("Frame", "WardenSwordFrame", UIParent)
@@ -421,8 +425,10 @@ local function build()
         local s = sw(); if not s then return end
         -- Opt-in pop-up when combat starts. (The old `not s.hidden` guard made
         -- this a no-op: s.hidden is only false while the HUD is already shown.)
+        -- A manual close (x, /ws hide, toggle) is respected until the next
+        -- manual open or /reload.
         if event == "PLAYER_REGEN_DISABLED"
-           and s.autoShowCombat and not self:IsShown() then
+           and s.autoShowCombat and not dismissed and not self:IsShown() then
             if ns.Debug then ns.Debug("sword", "auto-show on combat start") end
             ns.WardenSword.Show()
         end
@@ -470,6 +476,7 @@ end
 function ns.WardenSword.Frame() return frame end
 
 function ns.WardenSword.Show()
+    dismissed = false
     if ns.Debug then ns.Debug("sword", "Show") end
     if not frame then build() end
     frame:Show()
@@ -480,6 +487,7 @@ function ns.WardenSword.Hide()
     if ns.Debug then ns.Debug("sword", "Hide") end
     if not frame then return end
     frame:Hide()
+    dismissed = true
     local s = sw(); if s then s.hidden = true end
 end
 
