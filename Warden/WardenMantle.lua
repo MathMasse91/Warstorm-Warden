@@ -206,11 +206,13 @@ local function layoutSpecRow(entries, class, modeLabel, topY, label)
                 ns.MsgWarn("No execution defined for " .. class .. " - " .. spec)
                 return
             end
-            fn(name, true)  -- immediate=true: un-throttled whisper (no WM button throttles)
-
+            local cmd = fn(name, true)  -- immediate=true: sent now (no WM button throttles)
+            if not cmd then
+                ns.MsgErr(name .. " is flagged as a human player - nothing sent.")
+                return
+            end
             ns.Engine.TrackSpec(guid, name, spec, class)
-            ns.MsgInfo(string.format("Sent spec %s (" .. ns.Persistence.GetInitRarity() .. " gear) -> %s.",
-                spec, ns.ColorClass(class, name)))
+            ns.MsgInfo(string.format("Sent `%s`.", cmd))
         end)
         t:Show()
     end

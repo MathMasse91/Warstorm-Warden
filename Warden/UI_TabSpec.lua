@@ -303,11 +303,13 @@ local function rebuildTilesFor(classToken)
                 ns.MsgWarn("No execution defined for " .. classToken .. " - " .. specName)
                 return
             end
-            fn(targetName)  -- pass resolved name so mouseover works, not just hard target
-
+            local cmd = fn(targetName)  -- pass resolved name so mouseover works, not just hard target
+            if not cmd then
+                ns.MsgErr(targetName .. " is flagged as a human player - nothing sent.")
+                return
+            end
             ns.Engine.TrackSpec(targetGUID, targetName, specName, classToken)
-            ns.MsgInfo(string.format("Sent spec %s (" .. ns.Persistence.GetInitRarity() .. " gear) -> %s.",
-                specName, ns.ColorClass(classToken, targetName)))
+            ns.MsgInfo(string.format("Queued `%s`.", cmd))
 
             -- BUG: the gold rim used to stay on the class's PvE default even
             -- after the user clicked a different tile, because `recommended`

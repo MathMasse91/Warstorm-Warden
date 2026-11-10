@@ -78,11 +78,11 @@ local function whisperSpec(specServerName, targetName, immediate)
     local target = targetName or UnitName("target")
     if not target then return end
     -- Spec + gear in one server init at the saved rarity (see Engine.SpecCommand).
-    ns.Engine.ApplySpec(target, specServerName, immediate)
+    return ns.Engine.ApplySpec(target, specServerName, immediate)
 end
 
 local function mkSpec(serverName)
-    return function(targetName, immediate) whisperSpec(serverName, targetName, immediate) end
+    return function(targetName, immediate) return whisperSpec(serverName, targetName, immediate) end
 end
 
 -- Warden spec key -> server spec name, where they differ. Everything else
