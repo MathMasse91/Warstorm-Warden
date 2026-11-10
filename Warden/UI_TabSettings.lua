@@ -109,7 +109,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
         ns.WhisperBlocker.SeedDefaults()
     end
 
-    local whisperP = ns.UI.Panel.Create(content, contentW - 16, 280, "Bot whisper filter")
+    local whisperP = ns.UI.Panel.Create(content, contentW - 16, 302, "Bot whisper filter")
     whisperP:SetPoint("TOPLEFT", globalP, "BOTTOMLEFT", 0, -6)
 
     -- Everything below the master switch (warning note, "LINES TO HIDE"
@@ -397,6 +397,6 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
 
     -- Final scroll-child height: sum of panel heights + 6 px gaps + 4 px top
     -- margin + 8 px bottom padding. Keep in sync if panel heights change.
-    content:SetHeight(4 + 130 + 6 + 280 + 6 + 70 + 6 + 180 + 6 + 96 + 6 + 80 + 8)
+    content:SetHeight(4 + 130 + 6 + 302 + 6 + 70 + 6 + 180 + 6 + 96 + 6 + 80 + 8)
 end
 

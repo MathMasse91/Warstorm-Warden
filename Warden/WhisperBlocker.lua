@@ -45,6 +45,8 @@ ns.WhisperBlocker = ns.WhisperBlocker or {}
 --   "Following"                                      (bot follow ack)
 --   "Using <item link> (<N> available) on self"     (bot item use)
 --   "Picking <spec>"    e.g. "Picking holy pve"      (bot talent-spec ack)
+--   "You are too low level: 35/80"                   (bot level gate; the
+--                                                    numbers are color-coded)
 --
 -- Notes on the trickier two:
 --   * askinvite: the player name and him/her pronoun change every time, so we
@@ -80,6 +82,8 @@ local BOT_WHISPER_PATTERNS = {
       pattern = "using.-|hitem.-available", anySender = true },
     { key = "picking",   label = "\"Picking <spec>\"  (your bots' talent spec)",
       pattern = "^%s*picking .- pv[ep][%s%p]*$", anySender = true },
+    { key = "toolow",    label = "\"You are too low level: N/80\"",
+      pattern = "^%s*you are too low level", anySender = true },
 }
 
 -- Exposed so UI_TabSettings can build one checkbox per line without
