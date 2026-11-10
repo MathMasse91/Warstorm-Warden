@@ -68,7 +68,7 @@ end
 -- ----------------------------------------------------------
 -- Frame construction
 -- ----------------------------------------------------------
-local function buildHeader(parent, width)
+local function buildHeader(parent)
     return ns.UI.HudChrome.BuildHeader(parent, {
         title   = "WARDENSWORD", hint = "/ws",
         height  = HEADER_H, pad = PAD,
@@ -395,7 +395,7 @@ local function build()
         storePosition()
     end)
 
-    frame.header   = buildHeader(frame, 240)
+    frame.header   = buildHeader(frame)
     frame.status   = buildStatusStrip(frame)
     buildMovementGrid(frame)
     buildStrategyRow(frame)
@@ -436,23 +436,20 @@ end
 -- Status strip content
 -- ----------------------------------------------------------
 local function countBots()
-    local total, t, h, d = 0, 0, 0, 0
+    local total = 0
     if GetNumRaidMembers() > 0 then
         for i = 1, GetNumRaidMembers() do
             local unit = "raid" .. i
             if UnitExists(unit) and UnitIsPlayer(unit) and not UnitIsUnit(unit, "player") then
                 total = total + 1
-                -- Crude role guess from class + spec data isn't available here
-                -- reliably, so leave T/H/D breakdown 0 unless Engine tracks it.
             end
         end
     else
         for i = 1, GetNumPartyMembers() do
-            local unit = "party" .. i
-            if UnitExists(unit) then total = total + 1 end
+            if UnitExists("party" .. i) then total = total + 1 end
         end
     end
-    return total, t, h, d
+    return total
 end
 
 function ns.WardenSword.RefreshStatus()

@@ -160,7 +160,6 @@ local function whisperFilter(_, _, message, author)
     -- bots, so they must be hidden regardless of group membership.
     if not p.anySender and isInMyGroup(author) then return false end
 
-    ns.WhisperBlocker._blocked = (ns.WhisperBlocker._blocked or 0) + 1
     if ns.DebugF then
         ns.DebugF("whisper", "blocked bot whisper (%s) from %s: %s",
             p.key, tostring(author), tostring(message))

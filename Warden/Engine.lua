@@ -50,12 +50,11 @@ ns.Engine.state = {
     elapsed         = 0,
     whisperElapsed  = 0,
     buildActive     = false,
-    buildStartedAt  = 0,
     lastAddSentAt   = 0,
     rosterBefore    = {},      -- { [guid] = true }
     specdGUIDs      = {},      -- { [guid] = true }
     assignedSpecs   = {},      -- { [guid] = { name, spec, classToken } } - session identity map
-    counters        = { spawned = 0, specd = 0, skipped = 0 },
+    counters        = { spawned = 0, specd = 0 },
     -- Create-raid "init first" mode (order from Feryll/Huntriss [DGEN]):
     -- while deferSpecs is set, joining bots are only recorded in `deferred`;
     -- their spec + strategy whispers go out after the gear init, because
@@ -308,7 +307,6 @@ function ns.Engine.StartBuild(plan, opts)
     -- Reset transient counters + queues
     s.counters.spawned = 0
     s.counters.specd   = 0
-    s.counters.skipped = 0
     wipe(s.specdGUIDs)
     wipe(s.whisperQueue)
     wipe(s.deferred)
@@ -389,7 +387,6 @@ function ns.Engine.StartBuild(plan, opts)
     end
 
     s.buildActive    = true
-    s.buildStartedAt = GetTime()
     s.lastAddSentAt  = GetTime()
     s.sending        = true
     s.completerAccum = 0

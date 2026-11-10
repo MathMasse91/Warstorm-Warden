@@ -7,12 +7,8 @@ local _, ns = ...
 ns.UI.Tabs      = ns.UI.Tabs      or {}
 ns.UI.Tabs.Help = ns.UI.Tabs.Help or {}
 
--- §3.1 inline helpers. Authoring shortcuts; rendering goes through
--- ns.UI.RichText.Format so |kbd[X]| / |ck[...]| / |em[...]| inline markers
--- work too.
-local function kbd(t) return "|cffffd100[" .. t .. "]|r" end
-local function ck(t)  return "|cffffebbf"  .. t .. "|r" end
-local function em(t)  return "|cffd9cdb0"  .. t .. "|r" end
+-- §3.1 inline markup: chapter text uses |kbd[X]| / |ck[...]| / |em[...]|
+-- markers, rendered by ns.UI.RichText.Format.
 
 -- §3.2 tunables
 local RAIL_W            = 180

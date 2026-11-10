@@ -140,7 +140,6 @@ ns.Tokens = {
     gold_dim   = { _hex("b89536") },
     gold_rim   = { _hex("a88a4c") },
     red_btn    = { _hex("7a1a15") },
-    red_btn_hi = { _hex("b92b22") },
     ink_red    = { _hex("e04a3a") },
     green      = { _hex("2ecc40") },
     amber      = { _hex("ff9a00") },
@@ -328,24 +327,6 @@ function ns.UI.Dropdown.style(drop, width)
     end
 
     return drop
-end
-
--- =====================================================================
--- Stone backdrop helper. The { bgFile=WHITE8x8, edgeFile=WHITE8x8,
--- edgeSize=1 } recipe was open-coded 20+ times across tabs. One call site
--- now.
--- =====================================================================
-ns.UI.Panel = ns.UI.Panel or {}
-function ns.UI.Panel.ApplyStoneBackdrop(frame, bgTok, rimTok, bgAlpha)
-    frame:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
-    bgTok  = bgTok  or ns.Tokens.stone_tile
-    rimTok = rimTok or ns.Tokens.stone_rim
-    frame:SetBackdropColor(bgTok[1], bgTok[2], bgTok[3], bgAlpha or 1)
-    frame:SetBackdropBorderColor(rimTok[1], rimTok[2], rimTok[3], 1)
 end
 
 -- =====================================================================

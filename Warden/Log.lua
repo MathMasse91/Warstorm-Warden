@@ -58,7 +58,6 @@ local function push(level, msg)
 end
 
 function ns.Log(msg)       push("INFO",  msg) end
-function ns.LogWarn(msg)   push("WARN",  msg) end
 function ns.LogError(msg)  push("ERROR", msg) end
 function ns.LogF(fmt, ...)
     if not isEnabled() then return end
@@ -115,8 +114,6 @@ function ns.DebugF(cat, fmt, ...)
     local ok, str = pcall(string.format, fmt, ...)
     ns.Debug(cat, ok and str or ("[DebugF fmt err] " .. tostring(fmt)))
 end
-
-function ns.DebugIsOn(cat) return catEnabled(cat) end
 
 -- =====================================================
 -- Combat trace (helps any bug that's combat-triggered). This is wired
@@ -204,7 +201,6 @@ local function handleDebugSubcommand(rest)
     end
 
     WardenDebug[sub] = (val == "on") or nil  -- nil-out on off so the SV stays tidy
-    if val == "on" then WardenDebug[sub] = true else WardenDebug[sub] = nil end
     ns.MsgInfo(string.format("debug %s: %s", sub, val:upper()))
 end
 

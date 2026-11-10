@@ -125,12 +125,6 @@ local function extractSpellId(raw)
     return id and tonumber(id) or nil
 end
 
-local function extractObjectId(raw)
-    if type(raw) ~= "string" then return nil end
-    local entry = raw:match("|Hfound:%d+:(%d+):|h")
-    return entry and tonumber(entry) or nil
-end
-
 local function extractRank(raw)
     if type(raw) ~= "string" then return nil end
     return raw:match("|c(%x%x%x%x%x%x%x%x)%a+|r%s*$")
@@ -153,13 +147,11 @@ end
 
 local TOK = ns.Tokens or {}
 local STONE_RIM = TOK.stone_rim or { 0.23, 0.18, 0.13 }
-local STONE_TILE= TOK.stone_tile or { 0.16, 0.13, 0.09 }
 local STONE_DARK= TOK.stone_dark or { 0.06, 0.04, 0.03 }
 local GOLD_RIM  = TOK.gold_rim  or { 0.66, 0.54, 0.30 }
 local GOLD      = TOK.gold      or { 1.00, 0.82, 0.00 }
 local GOLD_DIM  = TOK.gold_dim  or { 0.72, 0.58, 0.21 }
 local INK_RED   = TOK.ink_red   or { 0.88, 0.29, 0.23 }
-local AMBER     = TOK.amber     or { 1.00, 0.60, 0.00 }
 local TEXT_WARM = TOK.text_warm or { 1.00, 0.92, 0.75 }
 
 -- Forward declarations. `ensureRow` references `rowOnClick`, but the

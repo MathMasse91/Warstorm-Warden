@@ -498,7 +498,6 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     -- SecureActionButtonTemplate buttons so the client treats the /target
     -- call as secure. Attribute updates are skipped while in combat so
     -- clicking one during a pull doesn't try to mutate secure state.
-    local actionY = -72
 
     local TOK = ns.Tokens
     local function makeSecureStoneBtn(parent, label, w, h)

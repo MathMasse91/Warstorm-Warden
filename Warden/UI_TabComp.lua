@@ -110,27 +110,6 @@ end
 local splitSet = ns.Data.SplitSet
 local CLASS_ICON = ns.Data.CLASS_ICON
 
-local function joinSet(set, orderedKeys)
-    local parts = {}
-    if orderedKeys then
-        for _, k in ipairs(orderedKeys) do if set[k] then table.insert(parts, k) end end
-    else
-        for k in pairs(set) do table.insert(parts, k) end
-        table.sort(parts)
-    end
-    return #parts > 0 and table.concat(parts, ",") or "(none)"
-end
-
-local function getSortedCompNames()
-    local t = {}
-    local db = ns.Persistence.DB
-    if db and db.comps then
-        for name in pairs(db.comps) do table.insert(t, name) end
-    end
-    table.sort(t)
-    return t
-end
-
 -- Group saved comps by size. Prefers the stored `comp.size` field; falls
 -- back to a trailing " 10" / " 25" in the name; else infers from the total
 -- row count rounding up to 5 / 10 / 25 / 40. Returns a map

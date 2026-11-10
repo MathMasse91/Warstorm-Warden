@@ -183,9 +183,6 @@ local function buildFrame()
     closeX:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -8, -8)
     closeX:SetScript("OnClick", function()
         ns.UI.Master._RequestHide("X click")
-        if ns.UI.Help and ns.UI.Help.frame and ns.UI.Help.frame:IsShown() then
-            ns.UI.Help.frame:Hide()
-        end
     end)
 
     -- Bind ESC-close
@@ -273,25 +270,13 @@ local function buildFrame()
     end
     refreshBLBtn()
     blBtn:SetScript("OnClick", function()
-        local db = ns.Persistence.DB
-        if not db then return end
-        db.bloodlust = not (db.bloodlust == true)
-
-        -- See Engine.Bloodlust() for the protocol rationale: the bot uses
-        -- `ss +/-<spellId>` (spell exclude list) rather than an `nc +bloodlust`
-        -- strategy flag, which doesn't exist. 2825 = Bloodlust (Horde);
-        -- 32182 = Heroism (Alliance). Pick the one that matches the player's
-        -- faction so same-faction shamans get the right command.
-        local faction = UnitFactionGroup and UnitFactionGroup("player")
-        local spellId = (faction == "Alliance") and 32182 or 2825
-        local cmd     = db.bloodlust and ("ss -" .. spellId) or ("ss +" .. spellId)
-
-        local n = ns.WhisperClass and ns.WhisperClass("SHAMAN", cmd) or 0
-        if n == 0 then
+        -- Same toggle as the HUD / keybind (protocol notes in Engine.Bloodlust).
+        local n, on = ns.Engine.Bloodlust()
+        if (n or 0) == 0 then
             ns.MsgWarn("No shaman bots found - BL had no target.")
         else
             ns.MsgInfo(string.format("Bloodlust %s - whispered %d shaman(s).",
-                db.bloodlust and "ON" or "OFF", n))
+                on and "ON" or "OFF", n))
         end
         refreshBLBtn()
     end)
@@ -545,10 +530,6 @@ function ns.UI.Master._RequestHide(reason)
     return tryHide(reason or "RequestHide")
 end
 
-function ns.UI.Master._RequestShow(reason)
-    return tryShow(reason or "RequestShow")
-end
-
 function ns.UI.Master.Toggle()
     local inC         = (InCombatLockdown and InCombatLockdown()) and "Y" or "N"
     local shownBefore = (frame and frame:IsShown() and frame:GetAlpha() > 0) and "Y" or "N"
@@ -590,11 +571,6 @@ function ns.UI.Master.ShowTab(key)
 end
 
 function ns.UI.Master.Frame() return frame end
-function ns.UI.Master.GetPane(key)
-    for i, def in ipairs(TAB_DEFS) do
-        if def.key == key then return panes[i] end
-    end
-end
 
 -- Global wrappers for Bindings.xml
 function WARDEN_Toggle() ns.UI.Master.Toggle() end

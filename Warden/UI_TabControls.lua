@@ -61,15 +61,6 @@ end
 
 local addTooltip = ns.UI.Tooltip.Attach
 
--- "kbd"-style hint tag: small gold-bordered label inside a panel header
-local function addKbdHint(panel, text)
-    local fs = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    fs:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -6, -4)
-    fs:SetText(text)
-    fs:SetTextColor(0.72, 0.58, 0.21, 1)
-    return fs
-end
-
 -- Panel header right-side meta text (small, muted mono)
 local function addPanelMeta(panel, text)
     local fs = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -83,7 +74,7 @@ end
 -- BuildInto
 -- ----------------------------------------------------------
 function ns.UI.Tabs.Controls.BuildInto(pane)
-    local paneW, paneH = pane:GetWidth(), pane:GetHeight()
+    local paneW = pane:GetWidth()
 
     -- Column layout: single column stack of full-width panels (matches V1).
     -- Panel heights tuned so everything fits in the 526-tall pane.

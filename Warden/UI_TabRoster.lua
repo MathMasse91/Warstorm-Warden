@@ -796,33 +796,13 @@ function ns.UI.Tabs.Roster.BuildInto(pane)
     selLbl:SetText("0 selected")
     frame.selCountLbl = selLbl
 
-    -- Throttled aura-change refresh (UNIT_AURA fires very often)
-    local dirty = false
+    -- Roster changes rebuild the list. (UNIT_AURA used to be watched too, but
+    -- since UX-01 the chips show the comp plan, not live auras, so every buff
+    -- tick caused a pointless rebuild.)
     frame:RegisterEvent("RAID_ROSTER_UPDATE")
     frame:RegisterEvent("PARTY_MEMBERS_CHANGED")
     frame:RegisterEvent("PLAYER_ENTERING_WORLD")
-    frame:RegisterEvent("UNIT_AURA")
-    frame:SetScript("OnEvent", function(self, event, unit)
-        if event == "UNIT_AURA" then
-            if unit and (string.find(unit, "^raid") or string.find(unit, "^party") or unit == "player") then
-                dirty = true
-            end
-        else
-            rebuild(); dirty = false
-        end
-    end)
-
-    frame._auraAccum = 0
-    frame:SetScript("OnUpdate", function(self, elapsed)
-        -- Skip while the Roster tab is hidden (self is the pane/frame).
-        if not self:IsVisible() then return end   -- skip while tab/window is hidden
-        if not dirty then return end
-        self._auraAccum = (self._auraAccum or 0) + elapsed
-        if self._auraAccum < 0.5 then return end
-        self._auraAccum = 0
-        dirty = false
-        rebuild()
-    end)
+    frame:SetScript("OnEvent", function() rebuild() end)
 
     frame:SetScript("OnShow", rebuild)
 end

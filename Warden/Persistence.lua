@@ -273,8 +273,6 @@ life:SetScript("OnEvent", function(_, event)
     end
 end)
 
-function ns.Persistence.Get() return ns.Persistence.DB end
-
 -- ----------------------------------------------------------
 -- Human-player flag helpers.
 -- ----------------------------------------------------------
