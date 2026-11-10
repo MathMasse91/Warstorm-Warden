@@ -212,7 +212,7 @@ local function layoutSpecRow(entries, class, modeLabel, topY, label)
                 return
             end
             ns.Engine.TrackSpec(guid, name, spec, class)
-            ns.MsgInfo(string.format("Sent `%s`.", cmd))
+            ns.MsgInfo(string.format("Init: `%s`.", cmd))
         end)
         t:Show()
     end
