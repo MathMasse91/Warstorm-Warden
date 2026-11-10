@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>Warden Shield & Pocket — Design Doc</title>
+<title>Warden Shield — Design Doc</title>
 <style>
 :root {
   /* Warden token palette (extracted from Core.lua ns.Tokens) */
@@ -303,58 +303,6 @@ pre {
 }
 .foot .grow { flex: 1; }
 
-/* Pocket-specific */
-.pocket-item-slot {
-  width: 28px; height: 28px;
-  background: #000; border: 1px solid var(--stone-rim);
-  display: inline-flex; align-items: center; justify-content: center;
-  position: relative;
-}
-.pocket-item-slot.empty { color: var(--gold-rim); font-size: 18px; opacity: 0.5; }
-.pocket-item-slot.filled {
-  background: radial-gradient(circle at 35% 30%, #4a2818, #2a1408);
-  color: var(--gold);
-}
-.pocket-item-slot .ic {
-  width: 22px; height: 22px;
-  background:
-    linear-gradient(135deg, #d4a040 0%, #8a5a18 100%);
-  border-radius: 2px;
-}
-.editbox {
-  background: #060403;
-  border: 1px solid var(--stone-rim);
-  color: var(--text-warm);
-  height: 20px;
-  padding: 0 6px;
-  font: 11px/1 "Helvetica Neue", sans-serif;
-  display: inline-flex; align-items: center;
-}
-.editbox.num { width: 30px; justify-content: center; }
-.editbox.linkbox { flex: 1; }
-.editbox.linkbox .link { color: var(--c-rogue); }
-
-.pocket-offer {
-  display: flex; align-items: center; gap: 8px;
-  padding: 0 8px;
-  height: 20px;
-  font: 11px/1 "Helvetica Neue", sans-serif;
-}
-.pocket-offer.top {
-  height: 28px;
-  background: linear-gradient(90deg, rgba(255,209,0,0.10), rgba(255,209,0,0.02));
-  border-left: 2px solid var(--gold);
-  margin-left: -1px;
-}
-.pocket-offer.top .name { font-size: 13px; font-weight: 700; color: var(--gold); }
-.pocket-offer.top .price { font-size: 13px; color: var(--gold); font-weight: 700; }
-.pocket-offer.second { height: 22px; }
-.pocket-offer.second .name { color: var(--text-warm); }
-.pocket-offer.second .price { color: var(--text-warm); }
-.pocket-offer .name { flex: 1; }
-.pocket-offer .crown { color: var(--gold); font-size: 11px; width: 10px; }
-.pocket-offer.zebra:nth-child(odd) { background: rgba(255,255,255,0.02); }
-
 .armed-banner {
   background: linear-gradient(180deg, rgba(255,154,0,0.22), rgba(255,154,0,0.06));
   border-bottom: 1px solid rgba(255,154,0,0.4);
@@ -498,13 +446,13 @@ pre {
 <main>
 
 <div class="eyebrow">Warden Addon · Design Document</div>
-<h1>Warden Shield &amp; Warden Pocket
+<h1>Warden Shield
   <small>Redesign aligné sur le langage visuel de Warden / Sword. Mai 2026.</small>
 </h1>
 
 <p class="lede">
-WardenShield et WardenPocket sont les deux modules satellites du raid commander Warden. Ce document
-documente leur langage visuel actuel, identifie les frictions à corriger, et propose une refonte
+WardenShield est un module satellite du raid commander Warden. Ce document
+documente son langage visuel actuel, identifie les frictions à corriger, et propose une refonte
 qui resserre la hiérarchie sans casser l’identité « stone &amp; gold » que Sword a déjà établie.
 Aucune des décisions ici ne touche au main frame Warden ni à WardenSword.
 </p>
@@ -516,11 +464,7 @@ Aucune des décisions ici ne touche au main frame Warden ni à WardenSword.
   <a href="#shield-mockup"><span class="num">4.</span><span>Shield — maquette</span></a>
   <a href="#shield-qa"><span class="num">5.</span><span>Shield — réponses aux 8 questions ouvertes</span></a>
   <a href="#shield-spec"><span class="num">6.</span><span>Shield — spec d’implémentation</span></a>
-  <a href="#pocket-overview"><span class="num">7.</span><span>Pocket — diagnostic</span></a>
-  <a href="#pocket-principles"><span class="num">8.</span><span>Pocket — principes de refonte</span></a>
-  <a href="#pocket-mockup"><span class="num">9.</span><span>Pocket — maquette</span></a>
-  <a href="#pocket-spec"><span class="num">10.</span><span>Pocket — spec d’implémentation</span></a>
-  <a href="#migration"><span class="num">11.</span><span>Migration &amp; risques</span></a>
+  <a href="#migration"><span class="num">7.</span><span>Migration &amp; risques</span></a>
 </nav>
 
 <!-- =================== 1. VOCABULAIRE =================== -->
@@ -548,18 +492,17 @@ existants.</p>
 </div>
 
 <h4>Densités et frères</h4>
-<p>Shield et Pocket sont les <em>frères visuels</em> de WardenSword : même header 22 px, même tier de bouton stone par défaut, même tile <code>UI-DialogBox-Background</code>, même bordure 1 px <code>gold_rim</code>. La largeur cible (240-280 px) les place dans la famille « compact HUD ». Le main frame Warden (760×600) reste l’unique frame « presentation ».</p>
+<p>Shield est le <em>frère visuel</em> de WardenSword : même header 22 px, même tier de bouton stone par défaut, même tile <code>UI-DialogBox-Background</code>, même bordure 1 px <code>gold_rim</code>. La largeur cible (240-280 px) les place dans la famille « compact HUD ». Le main frame Warden (760×600) reste l’unique frame « presentation ».</p>
 
 <table class="kv">
   <tr><th>Sword</th><td>240 px · compact · HIGH strata · contrôle de raid mid-fight</td></tr>
   <tr><th>Shield</th><td>260 px · compact · HIGH strata · discovery de bots</td></tr>
-  <tr><th>Pocket</th><td>280 px · compact · MEDIUM strata · WTS aggregator</td></tr>
   <tr><th>Main</th><td>760×600 · presentation · HIGH strata · setup &amp; comp</td></tr>
 </table>
 
 <h4>Grammaire d’interaction commune</h4>
 <ul>
-  <li><strong>Header glyphs</strong> : <code>o</code> / <code>*</code> pour lock, <code>x</code> rouge pour close. Aucun chrome Blizzard sauf <code>UIPanelCloseButton</code> (Pocket l’utilise déjà ; Shield et Sword ont leur propre glyphe).</li>
+  <li><strong>Header glyphs</strong> : <code>o</code> / <code>*</code> pour lock, <code>x</code> rouge pour close. Aucun chrome Blizzard sauf <code>UIPanelCloseButton</code> (Shield et Sword ont leur propre glyphe).</li>
   <li><strong>Hover</strong> : ADD-blend blanc à 10 % alpha sur le bouton — déjà géré par <code>ns.UI.Button</code>.</li>
   <li><strong>Active / armed</strong> : la bordure passe de <code>stone_rim</code> à <code>gold_rim</code>. Jamais de remplissage gold sauf pour le bouton <code>BLOODLUST ON</code> de Sword.</li>
   <li><strong>Pulse</strong> : 120 ms gold rim → stone, sur clic d’une row (cf. <code>row.pulse</code> dans <code>Shield.lua</code>).</li>
@@ -637,7 +580,7 @@ sauter au bon contrôle.</p>
 
 <ol>
   <li><strong>La cible est l’ancre</strong>. Le bot verrouillé occupe une bande dédiée en tête, plus haute (28 px), classe en couleur en grand. Quand rien n’est verrouillé, cette bande montre la live target en italique/dim — c’est un sas, pas une rangée d’égale importance.</li>
-  <li><strong>Capture state &gt; status text</strong>. Quand la fenêtre de capture est ouverte, une <em>armed banner</em> ambrée apparaît sous le header (4 px de haut) — identique au pattern que Pocket utilisera pour <code>Listening...</code>. Plus besoin de relire le status.</li>
+  <li><strong>Capture state &gt; status text</strong>. Quand la fenêtre de capture est ouverte, une <em>armed banner</em> ambrée apparaît sous le header (4 px de haut). Plus besoin de relire le status.</li>
   <li><strong>Mode = segmented control</strong>. Les cinq boutons « cast / on Y / on me / ban / unban » deviennent un seul widget visuellement uni (un bouton n’est <em>jamais</em> activable seul ; un seul état actif à la fois). On gagne 1 frontière sur 5, et le mode actif est lu comme un sélecteur.</li>
   <li><strong>Banned dans la capture list</strong>. Les sorts bannis dans la liste capturée sont rendus strike-through avec un point rouge à gauche. Plus besoin de basculer pour vérifier. <code>[exclusions: N]</code> devient une <em>vue alternée</em>, pas un mécanisme de check.</li>
   <li><strong>Section headers visibles</strong>. <code>=== Spells ===</code> devient une ligne de séparation typographique gold-rim, scrollable comme les autres mais non-cliquable. Le scroll-to-section devient naturel.</li>
@@ -1037,7 +980,7 @@ sauter au bon contrôle.</p>
 --   opts = { onUpdate = fn returning {seconds, lines} }
 --   frame:Arm(seconds) / frame:Disarm()</pre>
 
-<p>Les deux sont des helpers réutilisables (Pocket s’en sert aussi pour son Listening state).</p>
+<p>Les deux sont des helpers réutilisables.</p>
 
 <h3>Changements de logique dans Shield.lua</h3>
 <ul>
@@ -1052,330 +995,18 @@ sauter au bon contrôle.</p>
 <h3>Persistence — pas de changement de schema</h3>
 <p>Tout passe par <code>db.shield</code> existant. Les états transitoires (filter text, multi-bot detection, banned cache) sont runtime-only.</p>
 
-<!-- =================== 7. POCKET DIAGNOSTIC =================== -->
-<h2 id="pocket-overview"><span class="num">7.</span>Pocket — diagnostic de l’existant</h2>
-
-<p>Pocket fonctionne mais son interface lit plate. La frame est <em>tout</em> du même rang typographique : titre, status, offers, footer. Le user a besoin de lire activement pour savoir où il en est. Or l’usage typique (annoncer en /1, attendre des bids, inviter le meilleur) implique des transitions d’état que la UI ne dramatise pas.</p>
-
-<div class="stage">
-  <div class="stage-tag">Pocket · état actuel · 1:1</div>
-  <div class="hud" style="width: 280px;">
-    <div class="head">
-      <span class="title" style="font-weight: 400; text-transform: none; letter-spacing: 0;">Warden Pocket</span>
-      <span class="right"><span class="glyph x">×</span></span>
-    </div>
-    <div class="row" style="height: 30px; gap: 8px;">
-      <span class="muted" style="font-size: 11px;">Item:</span>
-      <span class="pocket-item-slot filled"><span class="ic"></span></span>
-      <span class="editbox linkbox"><span class="link">[Spice Bread]</span></span>
-      <span class="btn red" style="width: 50px;">WTS</span>
-    </div>
-    <div style="padding: 4px 10px; font: 11px/1 'Helvetica Neue', sans-serif;" class="amber">Listening...</div>
-    <div style="background: var(--stone-dark); height: 180px; padding: 4px 8px; display: flex; flex-direction: column; gap: 0;">
-      <div class="pocket-offer zebra"><span class="gold">Sneakily</span><span></span><span class="gold">12g 21s</span></div>
-      <div class="pocket-offer zebra"><span class="warm">Mooshie</span><span></span><span class="warm">9g 5s</span></div>
-      <div class="pocket-offer zebra"><span class="warm">Botzar</span><span></span><span class="warm">7g</span></div>
-      <div class="pocket-offer zebra"><span class="warm">Crustyfeet</span><span></span><span class="warm">5g 50s</span></div>
-      <div class="pocket-offer zebra"><span class="warm">Brewmaister</span><span></span><span class="warm">2g 99s</span></div>
-    </div>
-    <div class="foot" style="height: 22px;">
-      <span class="btn short">Clear</span>
-      <span class="muted" style="font-size: 10px;">Top:</span>
-      <span class="editbox num">20</span>
-      <span class="muted" style="font-size: 10px;">Wait:</span>
-      <span class="editbox num">30</span><span class="muted" style="font-size: 10px;">s</span>
-      <span class="grow"></span>
-      <span class="btn short">Stop</span>
-    </div>
-  </div>
-  <div class="stage-caption">État actuel — armed, 5 offers reçues. « Listening... » est une ligne de texte ; rien d’autre ne signale que la frame écoute activement. La hiérarchie price/name est plate.</div>
-</div>
-
-<h3>Frictions identifiées</h3>
-<ul>
-  <li><strong>Pas de signal d’armed</strong>. Le seul indicateur est <code>|cffffaa00Listening...|r</code> en texte. À l’œil, la frame en armed et la frame en idle se ressemblent à 95 %.</li>
-  <li><strong>Le best bid est juste « plus gold »</strong>. Sur 20 offers à l’écran, le #1 doit être instantanément lisible — il ne l’est pas.</li>
-  <li><strong>Top: et Wait: sont des champs nus</strong>. Ils règlent <em>la même règle</em> (« quand auto-inviter ») mais sont posés à plat sans grouping. Un user qui voit Pocket pour la première fois ne devine pas qu’il s’agit d’un OR-cap.</li>
-  <li><strong>Trade banner détachée</strong>. Quand TRADE_SHOW fire, la banner apparaît au centre de l’écran — déconnectée visuellement de Pocket alors qu’elle en est la suite logique.</li>
-  <li><strong>L’état <code>Invited</code> est terminal mais discret</strong>. « Invited Sneakily (12g 21s) » en vert, c’est la victoire — mais visuellement c’est la même rangée que le idle.</li>
-</ul>
-
-<!-- =================== 8. POCKET PRINCIPLES =================== -->
-<h2 id="pocket-principles"><span class="num">8.</span>Pocket — principes de refonte</h2>
-
-<ol>
-  <li><strong>Trois phases visuellement distinctes</strong>. <em>Idle</em> (gris-stone), <em>Listening</em> (banner ambrée pulsée en tête), <em>Invited</em> (banner verte fixe). Ces trois états doivent être identifiables en vision périphérique.</li>
-  <li><strong>Le #1 occupe une rangée dédiée</strong>. Hauteur 28 px (vs 18 pour les autres), background gold faiblement teinté, accent gauche gold solide. Le #2 est en 22 px, semi-gras. Le reste à 18 px régulier. Décroissance visuelle = décroissance de pertinence.</li>
-  <li><strong>Auto-invite rule = une phrase</strong>. Au lieu de « Top: 20  Wait: 30s » on lit « Auto-invite at 20 offers or after 30s — whichever first ». Les numbers restent éditables in-place mais sont incrustés dans la phrase.</li>
-  <li><strong>Trade banner = action bar dockée</strong>. Quand TRADE_SHOW fire et que la frame Pocket est visible, la banner remplace le footer (action bar dockée). Quand la frame Pocket est cachée, la banner flotte (comportement actuel). Plus de double-frame en concurrence à l’écran.</li>
-  <li><strong>Item slot plus grand</strong>. 32×32 au lieu de 22×22 — c’est la première chose qu’on remplit. Quand vide, hint « drop item here » en italique gold_dim.</li>
-</ol>
-
-<!-- =================== 9. POCKET MOCKUP =================== -->
-<h2 id="pocket-mockup"><span class="num">9.</span>Pocket — maquette refonte</h2>
-
-<div class="stage row">
-  <!-- IDLE -->
-  <div>
-    <div class="hud" style="width: 280px;">
-      <div class="head">
-        <span class="title">WARDEN POCKET</span>
-        <span class="hint">/wp</span>
-        <span class="right"><span class="glyph x">x</span></span>
-      </div>
-      <div style="padding: 10px 10px 8px; display: flex; align-items: center; gap: 10px;">
-        <div class="pocket-item-slot empty" style="width: 32px; height: 32px;">+</div>
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 3px;">
-          <div class="editbox linkbox" style="width: 100%; box-sizing: border-box; height: 22px;">
-            <span class="muted" style="font-style: italic; font-size: 10.5px;">drop item or shift-click from bag</span>
-          </div>
-          <div class="muted" style="font-size: 9.5px; letter-spacing: 0.05em;">channel 1 / General</div>
-        </div>
-        <span class="btn red" style="width: 56px; height: 32px;" disabled>WTS</span>
-      </div>
-      <div class="rule"></div>
-      <div style="padding: 8px 10px 6px;">
-        <div class="muted" style="font: 10.5px/1.4 'Charter', Georgia, serif; font-style: italic;">
-          Auto-invite top bidder after
-          <span class="warm" style="font-style: normal;"><span class="editbox num" style="font-size: 10.5px; display: inline-flex; height: 16px;">20</span></span> offers
-          or
-          <span class="warm" style="font-style: normal;"><span class="editbox num" style="font-size: 10.5px; display: inline-flex; height: 16px;">30</span></span> seconds —
-          whichever first.
-        </div>
-      </div>
-      <div style="background: var(--stone-dark); height: 168px; padding: 24px 12px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 6px; border-top: 1px solid var(--stone-rim);">
-        <div style="font: 600 11px/1 'Helvetica Neue', sans-serif; letter-spacing: 0.10em; text-transform: uppercase;" class="muted">No offers yet</div>
-        <div style="font: 11px/1.5 'Charter', Georgia, serif; font-style: italic; text-align: center; max-width: 200px;" class="muted">drop an item above and hit WTS to broadcast a buy request to channel 1</div>
-      </div>
-      <div class="foot">
-        <span class="btn short">clear</span>
-        <span class="grow"></span>
-        <span class="btn short" disabled>stop</span>
-      </div>
-    </div>
-    <div class="figure-cap">État idle — slot vide, WTS désactivé. La règle d’auto-invite est lisible comme une phrase.</div>
-  </div>
-
-  <!-- ARMED -->
-  <div>
-    <div class="hud" style="width: 280px;">
-      <div class="head">
-        <span class="title">WARDEN POCKET</span>
-        <span class="hint">/wp</span>
-        <span class="right"><span class="glyph x">x</span></span>
-      </div>
-      <!-- ARMED BANNER -->
-      <div class="armed-banner">
-        <span class="blip"></span>
-        LISTENING
-        <span style="margin-left:auto" class="gold">22s left · 5 offers</span>
-      </div>
-      <div style="padding: 8px 10px 6px; display: flex; align-items: center; gap: 10px;">
-        <div class="pocket-item-slot filled" style="width: 32px; height: 32px;"><span class="ic"></span></div>
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
-          <div class="warm" style="font: 600 12px/1.2 'Helvetica Neue', sans-serif;">Spice Bread</div>
-          <div class="muted" style="font-size: 9.5px;">broadcast to /1</div>
-        </div>
-        <span class="btn" style="width: 56px; height: 32px;">re-WTS</span>
-      </div>
-      <div class="rule"></div>
-      <!-- best offer rail -->
-      <div style="background: var(--stone-dark); padding: 4px 0;">
-        <div class="pocket-offer top">
-          <span class="crown">★</span>
-          <span class="name">Sneakily</span>
-          <span class="price">12g 21s</span>
-        </div>
-        <div class="pocket-offer second">
-          <span class="crown muted">·</span>
-          <span class="name">Mooshie</span>
-          <span class="price">9g 5s</span>
-        </div>
-        <div class="pocket-offer">
-          <span class="crown muted">·</span>
-          <span class="name muted">Botzar</span>
-          <span class="price muted">7g</span>
-        </div>
-        <div class="pocket-offer">
-          <span class="crown muted">·</span>
-          <span class="name muted">Crustyfeet</span>
-          <span class="price muted">5g 50s</span>
-        </div>
-        <div class="pocket-offer">
-          <span class="crown muted">·</span>
-          <span class="name muted">Brewmaister</span>
-          <span class="price muted">2g 99s</span>
-        </div>
-        <div style="height: 80px;"></div>
-      </div>
-      <div class="foot">
-        <span class="btn short">clear</span>
-        <span class="muted" style="font: 10px/1.3 'Charter', Georgia, serif; font-style: italic; padding: 0 6px;">5/20 offers · auto-invite in 22s</span>
-        <span class="grow"></span>
-        <span class="btn short">stop</span>
-      </div>
-    </div>
-    <div class="figure-cap">Armed — 5 offers reçues. Sneakily est <em>visiblement</em> en tête.<br>Le footer condense le statut au lieu de cacher les seuils.</div>
-  </div>
-</div>
-
-<div class="stage row">
-  <!-- INVITED -->
-  <div>
-    <div class="hud" style="width: 280px;">
-      <div class="head">
-        <span class="title">WARDEN POCKET</span>
-        <span class="hint">/wp</span>
-        <span class="right"><span class="glyph x">x</span></span>
-      </div>
-      <!-- INVITED banner (green variant) -->
-      <div class="armed-banner" style="background: linear-gradient(180deg, rgba(46,204,64,0.20), rgba(46,204,64,0.04)); border-bottom-color: rgba(46,204,64,0.4); color: var(--green);">
-        <span class="blip" style="background: var(--green); box-shadow: 0 0 6px var(--green); animation: none;"></span>
-        INVITED <span class="warm">SNEAKILY</span>
-        <span style="margin-left:auto" class="green">12g 21s</span>
-      </div>
-      <div style="padding: 8px 10px 6px; display: flex; align-items: center; gap: 10px;">
-        <div class="pocket-item-slot filled" style="width: 32px; height: 32px;"><span class="ic"></span></div>
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
-          <div class="warm" style="font: 600 12px/1.2 'Helvetica Neue', sans-serif;">Spice Bread</div>
-          <div class="muted" style="font-size: 9.5px;">waiting for trade window…</div>
-        </div>
-      </div>
-      <div class="rule"></div>
-      <div style="background: var(--stone-dark); padding: 4px 0;">
-        <div class="pocket-offer top">
-          <span class="crown">★</span>
-          <span class="name">Sneakily</span>
-          <span class="price">12g 21s</span>
-        </div>
-        <div class="pocket-offer second">
-          <span class="crown muted">·</span>
-          <span class="name muted">Mooshie</span>
-          <span class="price muted">9g 5s</span>
-        </div>
-        <div class="pocket-offer">
-          <span class="crown muted">·</span>
-          <span class="name muted">Botzar</span>
-          <span class="price muted">7g</span>
-        </div>
-        <div style="height: 122px;"></div>
-      </div>
-      <div class="foot">
-        <span class="btn short" style="color: var(--ink-red); border-color: #5a2018;">kick &amp; clear</span>
-        <span class="grow"></span>
-        <span class="muted" style="font: 10px/1.3 'Charter', Georgia, serif; font-style: italic; padding: 0 6px;">trade window opens, banner docks below</span>
-      </div>
-    </div>
-    <div class="figure-cap">Invited — banner verte, Sneakily promu, controls deviennent « kick &amp; clear ».</div>
-  </div>
-
-  <!-- TRADE BANNER DOCKED -->
-  <div>
-    <div class="hud" style="width: 280px;">
-      <div class="head">
-        <span class="title">WARDEN POCKET</span>
-        <span class="hint">/wp</span>
-        <span class="right"><span class="glyph x">x</span></span>
-      </div>
-      <div class="armed-banner" style="background: linear-gradient(180deg, rgba(46,204,64,0.20), rgba(46,204,64,0.04)); border-bottom-color: rgba(46,204,64,0.4); color: var(--green);">
-        <span class="blip" style="background: var(--green); box-shadow: 0 0 6px var(--green); animation: none;"></span>
-        TRADE OPEN <span class="warm">SNEAKILY</span>
-      </div>
-      <div style="padding: 8px 10px 6px; display: flex; align-items: center; gap: 10px;">
-        <div class="pocket-item-slot filled" style="width: 32px; height: 32px;"><span class="ic"></span></div>
-        <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
-          <div class="warm" style="font: 600 12px/1.2 'Helvetica Neue', sans-serif;">Spice Bread</div>
-          <div class="muted" style="font-size: 9.5px;">unit price <span class="gold">12g 21s</span></div>
-        </div>
-      </div>
-      <div class="rule"></div>
-      <!-- DOCKED TRADE ACTION BAR -->
-      <div style="background: linear-gradient(180deg, var(--stone-mid), var(--stone-dark)); padding: 12px 10px;">
-        <div style="font: 600 9.5px/1 'Helvetica Neue', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-rim); margin-bottom: 8px;">Set price for trade</div>
-        <div style="display: flex; align-items: center; gap: 8px; padding: 8px; background: var(--stone-dark); border: 1px solid var(--gold-rim);">
-          <span class="editbox num" style="height: 22px;">1</span>
-          <span class="muted">×</span>
-          <span class="gold" style="font-weight: 600;">12g 21s</span>
-          <span class="muted">=</span>
-          <span style="flex: 1; text-align: right; font: 700 14px/1 'Helvetica Neue', sans-serif;" class="gold">12g 21s</span>
-        </div>
-        <div style="display: flex; gap: 6px; margin-top: 8px;">
-          <span class="btn" style="flex: 1;">whisper total</span>
-          <span class="btn gold" style="flex: 1;">whisper + accept</span>
-        </div>
-      </div>
-      <div class="foot">
-        <span class="btn short" style="color: var(--ink-red); border-color: #5a2018;">kick &amp; clear</span>
-        <span class="grow"></span>
-        <span class="muted" style="font: 10px/1.3 'Charter', Georgia, serif; font-style: italic; padding: 0 6px;">close trade to return</span>
-      </div>
-    </div>
-    <div class="figure-cap">Trade fenêtre ouverte — la banner trade docke dans la frame Pocket.<br>Bonus button <code>whisper + accept</code> envoie le prix puis appelle <code>AcceptTrade()</code>.</div>
-  </div>
-</div>
-
-<!-- =================== 10. POCKET SPEC =================== -->
-<h2 id="pocket-spec"><span class="num">10.</span>Pocket — spec d’implémentation</h2>
-
-<h3>Nouvelles dimensions</h3>
-<table class="kv">
-  <tr><th>FRAME_W</th><td>280 (inchangé)</td></tr>
-  <tr><th>HEADER_H</th><td>22 (inchangé)</td></tr>
-  <tr><th>BANNER_H</th><td>16 — conditionnel (armed, invited, trade open)</td></tr>
-  <tr><th>SLOT_W / SLOT_H</th><td>32 / 32 (augmenté de 22)</td></tr>
-  <tr><th>INPUT_H</th><td>48 — item slot + name + WTS button</td></tr>
-  <tr><th>RULE_H</th><td>3 — paddings autour de la 1 px line</td></tr>
-  <tr><th>AUTO_RULE_H</th><td>22 — phrase éditable</td></tr>
-  <tr><th>LIST_H</th><td>variable — fill</td></tr>
-  <tr><th>OFFER_TOP_H</th><td>28 — #1 offer (gold rail)</td></tr>
-  <tr><th>OFFER_SECOND_H</th><td>22 — #2 offer</td></tr>
-  <tr><th>OFFER_H</th><td>18 — #3+ offers</td></tr>
-  <tr><th>FOOTER_H</th><td>22 (inchangé)</td></tr>
-</table>
-
-<h3>Nouveau comportement Trade Banner</h3>
-<ul>
-  <li><strong>TRADE_SHOW</strong> :
-    <ul>
-      <li>Si <code>state.frame:IsShown()</code> → docker la trade UI dans la frame (remplace le scroll list temporairement). La frame Pocket grandit de +110 px.</li>
-      <li>Sinon → comportement actuel (banner flottante au centre-bas).</li>
-    </ul>
-  </li>
-  <li><strong>TRADE_CLOSED</strong> : retour à l’état précédent (scroll list visible, taille originale).</li>
-  <li><strong>whisper + accept</strong> : <code>SendChatMessage(formatCopperCompact(total), "WHISPER", nil, name)</code> puis <code>AcceptTrade()</code>. C’est la séquence que 95 % des users veulent ; ça vaut un bouton séparé.</li>
-</ul>
-
-<h3>Banner factory partagée</h3>
-<p>L’<code>armed-banner</code> est strictement la même primitive que celle de Shield, juste avec une couleur paramétrée. À implémenter une fois dans <code>Core.lua</code> comme <code>ns.UI.Banner.Create(parent, variant)</code> où <code>variant ∈ {amber, green, red}</code>. Shield + Pocket l’utilisent.</p>
-
-<h3>Tier de prix &mdash; pas de magic dans la sort</h3>
-<p>La hiérarchie #1/#2/#3+ est purement visuelle. La sort reste <code>copper descending</code> comme aujourd’hui. <code>refreshList</code> applique simplement :</p>
-<pre>local heights = { 28, 22, 18, 18, ... }
-local backgrounds = {
-  goldRail,        -- top
-  nil,             -- second
-  nil,             -- rest
-}
-local alphas = { 1.0, 0.85, 0.55 }  -- text alpha decay</pre>
-<p>Toujours pool-based, pas de re-création.</p>
-
-<h3>Item slot agrandi — drag/drop inchangé</h3>
-<p>L’API <code>OnReceiveDrag</code> + <code>OnClick</code> + shift-click reste identique ; seul le <code>SetSize(32, 32)</code> change. Le placeholder « + » est un FontString gold_rim 18 px centré, alpha 0.5.</p>
-
 <!-- =================== 11. MIGRATION =================== -->
-<h2 id="migration"><span class="num">11.</span>Migration &amp; risques</h2>
+<h2 id="migration"><span class="num">7.</span>Migration &amp; risques</h2>
 
 <h3>Ordre d’implémentation suggéré</h3>
 <ol>
   <li><strong>Core.lua : helpers partagés</strong>. <code>ns.UI.Banner.Create</code>, <code>ns.UI.Segmented.Create</code>. Pas de breaking change — purement additif.</li>
   <li><strong>Shield.lua : refonte non-destructive</strong>. La frame existante est démontée et reconstruite avec les nouvelles primitives. Aucun changement de schema <code>db.shield</code>. Aucun changement de slash commands, de keybindings, de comportement de capture/dispatch.</li>
-  <li><strong>Pocket.lua : refonte non-destructive</strong>. Idem. <code>state</code> module-local conserve sa shape ; seul le rendu change. L’ajout du dock-trade est additif (l’ancien comportement flottant est gardé en fallback).</li>
 </ol>
 
 <h3>Risques techniques</h3>
 <table class="kv">
-  <tr><th>Trade dock</th><td>Sur 3.3.5a, la fenêtre Blizzard <code>TradeFrame</code> apparaît à un anchor fixe. Si elle chevauche Pocket-once-docked, le user va devoir bouger Pocket. Risque acceptable — la frame est déjà movable. Tester avec un setup typique (Pocket en bas-droite par défaut).</td></tr>
-  <tr><th>Banner clamp</th><td>L’armed-banner sous le header consomme 16 px. Si Pocket est dragué en haut de l’écran, vérifier que le frame reste <code>ClampedToScreen</code> et que les heights dynamiques (banner conditionnelle) ne provoquent pas un saut visuel quand armée. Mitigation : toujours réserver les 16 px (banner visible mais transparente quand idle).</td></tr>
+  <tr><th>Banner clamp</th><td>L’armed-banner sous le header consomme 16 px. Si la frame est draguée en haut de l’écran, vérifier que le frame reste <code>ClampedToScreen</code> et que les heights dynamiques (banner conditionnelle) ne provoquent pas un saut visuel quand armée. Mitigation : toujours réserver les 16 px (banner visible mais transparente quand idle).</td></tr>
   <tr><th>Segmented widget</th><td>5 options à 22 px chacune sur une frame de 260 px = 220 px de largeur disponible (après pads). Si on ajoute un 6e mode plus tard, faire passer à 2 lignes ou troncatuer. Pas de problème immédiat.</td></tr>
   <tr><th>Section headers</th><td><code>buildDisplayItems</code> doit insérer les items section <em>avant tri</em>, sinon la sort alpha les éparpille. Stocker l’ordre d’apparition dans <code>line.captureOrder</code> et trier par section puis nom dans la section.</td></tr>
   <tr><th>Banned lookup</th><td>Le check <code>banned[spellId]</code> par row est O(1) si on précalcule un <code>{[id]=true}</code> set à chaque <code>refreshList</code>. Trivial.</td></tr>
@@ -1390,8 +1021,8 @@ local alphas = { 1.0, 0.85, 0.55 }  -- text alpha decay</pre>
 </ul>
 
 <div class="foot-sig">
-Document de design préparé pour la refonte UI de WardenShield et WardenPocket — Warden v1.0.0.<br>
-Aligné sur <code>WARDEN_UI.md</code>, <code>WARDEN_SHIELD.md</code>, <code>WARDEN_POCKET.md</code> et le feature brief 2026-04-28.<br>
+Document de design préparé pour la refonte UI de WardenShield — Warden v1.0.0.<br>
+Aligné sur <code>WARDEN_UI.md</code>, <code>WARDEN_SHIELD.md</code> et le feature brief 2026-04-28.<br>
 Aucun token de couleur, aucun tier de bouton, aucun schema de persistance n’est introduit hors de l’existant <code>Core.lua</code> / <code>Persistence.lua</code>.
 </div>
 

@@ -1,7 +1,7 @@
 # Warden Help Tab — Spec d'implémentation pour Claude Code
 
 **Cible** : `UI_TabHelp.lua` (refonte intégrale) + ajouts dans `Core.lua` + un champ dans `Persistence.lua`.
-**Hors périmètre** : `UI_Master.lua`, masthead/status footer partagés, tous les autres tabs, `WardenSword.lua`, `Shield.lua`, `Pocket.lua`, slash commands, keybindings.
+**Hors périmètre** : `UI_Master.lua`, masthead/status footer partagés, tous les autres tabs, `WardenSword.lua`, `Shield.lua`, slash commands, keybindings.
 **Référence visuelle** : `Warden Help Tab Design Doc.html`.
 
 Ce document est un plan d'exécution séquentiel. Chaque phase est ordonnée et testable individuellement.
@@ -10,7 +10,7 @@ Ce document est un plan d'exécution séquentiel. Chaque phase est ordonnée et 
 
 ## 0. Règles globales
 
-- **Ne touche pas** : `UI_Master.lua`, `Engine.lua`, `WardenSword.lua`, `Shield.lua`, `Pocket.lua`, `Data.lua`, `Bindings.xml`, `Warden.toc`.
+- **Ne touche pas** : `UI_Master.lua`, `Engine.lua`, `WardenSword.lua`, `Shield.lua`, `Data.lua`, `Bindings.xml`, `Warden.toc`.
 - **Conserve** : la signature publique `ns.UI.Tabs.Help.BuildInto(pane)` — un seul argument, pas de retour. Conserve aussi la fonction `kbd()` locale au fichier ; on l'étend, on ne la supprime pas.
 - **Tokens** : pas de nouvelle couleur. Utilise uniquement `ns.Tokens.{stone_dark, stone_mid, stone_tile, stone_rim, gold, gold_dim, gold_rim, amber, green, ink_red, text_warm}`. La couleur "parchment" (#d9cdb0) du body est obtenue via `GameFontHighlightSmall:GetTextColor()` — ne hardcode pas.
 - **Boutons** : il n'y a pas de bouton secure dans le Help tab. Les rows de chapitres sont des `Frame`s avec un `SetScript("OnMouseUp", ...)` et un `EnableMouse(true)`. Pas d'`UIPanelButtonTemplate`.
@@ -165,13 +165,12 @@ local CHAPTERS = {
         id = "intro", group = "START HERE", title = "What is Warden?",
         eyebrow = "Chapter 01 · Start here",
         body = {
-            { kind = "lede", text = "Warden is the in-game UI for WarStormBot. It replaces hundreds of dot-commands and whispers with a visual interface to assemble, spec, command, and trade with your bots." },
+            { kind = "lede", text = "Warden is the in-game UI for WarStormBot. It replaces hundreds of dot-commands and whispers with a visual interface to assemble, spec, gear, and command your bots." },
             { kind = "p",    text = "Instead of memorising commands or whispering every action by hand, Warden gives you four workflows in one window:" },
             { kind = "bullets", items = {
                 "Build raid compositions from presets or a class chip tray.",
                 "Summon and spec bots in one click.",
                 "Command the raid mid-fight from a floating HUD.",
-                "Automate WTS sales to buyer bots.",
             }},
             { kind = "h2",   text = "The four-phase flow" },
             { kind = "p",    text = "Every Warden session goes through the same loop: |em[build]| a comp, |em[spawn]| the bots, |em[command]| them during combat, |em[refine]| the setup when the pull tells you what was missing." },
@@ -215,7 +214,6 @@ local CHAPTERS = {
                 { "/wden",    "Short alias for |ck[/warden]|." },
                 { "/ws",      "Toggle the WardenSword HUD." },
                 { "/wsh",     "Toggle WardenShield." },
-                { "/wp",      "Toggle WardenPocket." },
             }},
             { kind = "h2",   text = "Status footer" },
             { kind = "p",    text = "The bar visible at the bottom of every tab shows live raid state — current target, queue depth, tracked bots, Bloodlust on/off, plus a slash-command hint. Updates on roster/target events and every 0.5s." },
@@ -233,7 +231,6 @@ local CHAPTERS = {
     -- MODULES --------------------------------------------------------
     { id = "sword",  group = "MODULES", title = "WardenSword",  eyebrow = "Chapter 07 · Modules", body = {} },
     { id = "shield", group = "MODULES", title = "WardenShield", eyebrow = "Chapter 08 · Modules", body = {} },
-    { id = "pocket", group = "MODULES", title = "WardenPocket", eyebrow = "Chapter 09 · Modules", body = {} },
 
     -- REFERENCE ------------------------------------------------------
     { id = "settings", group = "REFERENCE", title = "Settings",         eyebrow = "Chapter 10 · Reference", body = {} },
@@ -609,7 +606,6 @@ Reprends chaque entry de l'ancien `SECTIONS[i].items[j] = {term, desc}` et redis
 - `intro` chapter : le lede + bullets + h2 "four-phase flow" + 2 p. Voir §3.3 pour le texte exact.
 - `first-raid` chapter : voir §3.3.
 - `shield` chapter : extrais le texte du brouillon ChatGPT fourni avec le projet (sections "WardenShield — Spell Discovery & Interaction"). Adapte au format AST.
-- `pocket` chapter : extrais le texte du brouillon ChatGPT (sections "WardenPocket — Automated WTS Trading"). Adapte.
 
 ---
 

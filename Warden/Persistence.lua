@@ -19,7 +19,7 @@ local COMMIT_SCALARS = {
 }
 
 -- Subtables preserved whole; always written so freshly-added keys survive.
-local COMMIT_SUBTABLES = { "comps", "playerFlags", "sword", "shield", "pocket", "mantle", "whisperFilters" }
+local COMMIT_SUBTABLES = { "comps", "playerFlags", "sword", "shield", "mantle", "whisperFilters" }
 
 -- ----------------------------------------------------------
 -- Schema init (idempotent)
@@ -89,16 +89,10 @@ local function initDB()
     if type(mt.locked) ~= "boolean" then mt.locked = false end
     if type(mt.hidden) ~= "boolean" then mt.hidden = true end
 
-    -- WardenPocket (/wp WTS aggregator) persisted state.
-    if type(db.pocket) ~= "table" then db.pocket = {} end
-    local pk = db.pocket
-    if type(pk.autoTrade) ~= "boolean" then pk.autoTrade = true  end
-    if type(pk.fullAuto)  ~= "boolean" then pk.fullAuto  = false end
-    if type(pk.maxOffers) ~= "number"  then pk.maxOffers = 20    end
-    if type(pk.maxWait)   ~= "number"  then pk.maxWait   = 30    end
-
     -- Drop stale keys from prior schema versions.
     if db.density ~= nil then db.density = nil end
+    -- WardenPocket was removed in v1.3.0 (server patched out bot WTS buying).
+    if db.pocket ~= nil then db.pocket = nil end
     if db.sword and db.sword.tone ~= nil then db.sword.tone = nil end
 
     -- Runtime-only defaults (not committed, never persisted).

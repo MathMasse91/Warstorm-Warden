@@ -116,19 +116,6 @@ A floating **discovery & capture** panel for inspecting a single bot.
 - Persistent **exclusions** view to manage everything you've banned
 - Player-flag guard — real players can never be picked
 
-### 💰 WardenPocket — `/wp`
-
-![WardenPocket](docs/images/pocket.webp)
-
-A hands-off **WTS auction** tool that sells to bot buyers for you.
-
-- Drop an item in the slot → `[WTS]` broadcasts it to General chat
-- Listens for whispered offers (`12g 21s` style) and **ranks bidders** highest-first
-- **Auto-invites the winner** when bids go quiet, hit your offer cap, or the timer runs out
-- Tunable: `Top` (max offers) and `Wait` (timeout seconds)
-- Trade banner: set quantity → it whispers the exact total to the winner
-- `[Stop]` freezes bidding, `[Clear]` resets and un-invites
-
 ### 🎽 WardenMantle — `/wm`
 
 ![WardenMantle](docs/images/mantle.png)
@@ -225,15 +212,6 @@ Direct HUD actions: `/ws summon · follow · stay · flee · aoe · burn · skul
 | `/wsh spells`    | Fire `spells` discovery on the target |
 | `/wsh help`      | Print the command list             |
 
-**WardenPocket**
-
-| Command          | What it does                          |
-|------------------|---------------------------------------|
-| `/wp`            | Toggle the WardenPocket HUD           |
-| `/wp show \| hide` | Explicit show / hide                |
-| `/wp ItemName`   | Toggle + pre-fill the item name field |
-| `/wardenpocket`  | Alias for `/wp`                       |
-
 **WardenMantle**
 
 | Command          | What it does                       |
@@ -265,6 +243,8 @@ Bindable under **ESC → Key Bindings → "Warden"**: toggle window, tab shortcu
 | Left-click    | Toggle main window        |
 | Shift-left    | Open Settings tab         |
 | Middle-click  | Toggle WardenSword HUD     |
+| Shift-middle  | Toggle WardenShield (`/wsh`) |
+| Ctrl-middle   | Toggle WardenMantle (`/wm`)  |
 | Right-click   | Open Help tab             |
 | Drag          | Orbit the minimap ring (saved per-character) |
 

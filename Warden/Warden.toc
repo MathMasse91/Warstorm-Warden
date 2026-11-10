@@ -17,7 +17,6 @@ Engine.lua
 WardenSword_Actions.lua
 WardenSword.lua
 Shield.lua
-Pocket.lua
 WardenMantle.lua
 WhisperBlocker.lua
 UI_Master.lua

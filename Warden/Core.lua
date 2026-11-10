@@ -476,7 +476,7 @@ function ns.UI.Panel.Create(parent, w, h, headerText)
 end
 
 -- =====================================================================
--- Shared HUD primitives used by WardenShield and WardenPocket.
+-- Shared HUD primitives (WardenShield banner; Segmented also used by Bot Comp).
 -- Banner: conditional state strip under a header (armed / invited / etc).
 -- Segmented: a mutually-exclusive option row that reads as a single widget
 -- rather than 5 independent buttons.

@@ -84,14 +84,14 @@ local function buildButton()
         if btnKind == "MiddleButton" then
             -- Modifier-stacked middle-click bindings:
             --   Shift+Middle -> WardenShield (/wsh)
-            --   Ctrl+Middle  -> WardenPocket (/wp)
+            --   Ctrl+Middle  -> WardenMantle (/wm)
             --   plain Middle -> WardenSword HUD toggle
             if IsShiftKeyDown() then
                 if ns.Shield and ns.Shield.Toggle then ns.Shield.Toggle() end
                 return
             end
             if IsControlKeyDown() then
-                if ns.Pocket and ns.Pocket.Toggle then ns.Pocket.Toggle() end
+                if ns.WardenMantle and ns.WardenMantle.Toggle then ns.WardenMantle.Toggle() end
                 return
             end
             if ns.WardenSword and ns.WardenSword.Toggle then ns.WardenSword.Toggle() end
@@ -112,7 +112,7 @@ local function buildButton()
         GameTooltip:AddLine(ns.Colors.key .. "Shift-left"   .. ns.Colors.reset .. ": open Settings", 1, 1, 1)
         GameTooltip:AddLine(ns.Colors.key .. "Middle-click" .. ns.Colors.reset .. ": toggle WardenSword HUD", 1, 1, 1)
         GameTooltip:AddLine(ns.Colors.key .. "Shift-middle" .. ns.Colors.reset .. ": toggle WardenShield (/wsh)", 1, 1, 1)
-        GameTooltip:AddLine(ns.Colors.key .. "Ctrl-middle"  .. ns.Colors.reset .. ": toggle WardenPocket (/wp)", 1, 1, 1)
+        GameTooltip:AddLine(ns.Colors.key .. "Ctrl-middle"  .. ns.Colors.reset .. ": toggle WardenMantle (/wm)", 1, 1, 1)
         GameTooltip:AddLine(ns.Colors.key .. "Right-click"  .. ns.Colors.reset .. ": open Help tab", 1, 1, 1)
         GameTooltip:AddLine(ns.Colors.key .. "Drag"         .. ns.Colors.reset .. ": orbit the minimap", 1, 1, 1)
         GameTooltip:Show()

@@ -1,6 +1,6 @@
-# Warden Shield & Pocket — Spec d'implémentation pour Claude Code
+# Warden Shield — Spec d'implémentation pour Claude Code
 
-**Cible** : `Warden/Shield.lua` et `Warden/Pocket.lua` (+ ajouts dans `Core.lua`).
+**Cible** : `Warden/Shield.lua` (+ ajouts dans `Core.lua`).
 **Hors périmètre** : `UI_Master.lua`, `WardenSword.lua`, slash commands, keybindings, schémas `WardenDB`.
 **Référence visuelle** : `Warden Design Doc.html`.
 
@@ -11,7 +11,7 @@ Ce document est un plan d'exécution. Il liste les modifications dans l'ordre, f
 ## 0. Règles globales
 
 - **Ne touche pas** : `UI_Master.lua`, `WardenSword.lua`, `Engine.lua`, `Persistence.lua` (sauf si explicitement listé), `Bindings.xml`, `Warden.toc`.
-- **Conserve** : tous les slash commands (`/wsh`, `/wp`), tous les keybindings (`WARDENSHIELD_TOGGLE`), tout le schéma `WardenDB.shield` et l'API publique (`ns.Shield.Show/Hide/Toggle/Clear/...`, `ns.Pocket.Show/Hide/Toggle`).
+- **Conserve** : tous les slash commands (`/wsh`), tous les keybindings (`WARDENSHIELD_TOGGLE`), tout le schéma `WardenDB.shield` et l'API publique (`ns.Shield.Show/Hide/Toggle/Clear/...`).
 - **Tokens** : aucune nouvelle couleur. Utilise `ns.Tokens.{stone_dark, stone_mid, stone_tile, stone_rim, gold, gold_dim, gold_rim, red_btn, ink_red, amber, green, text_warm}` uniquement.
 - **Boutons** : utilise `ns.UI.Button.{stone, gold, red, warn}` — pas de nouvelle tier.
 - **Style de code** : copie le ton de l'existant Shield.lua (commentaires en anglais, `local function` partout, forward declarations quand nécessaire).
@@ -21,11 +21,11 @@ Ce document est un plan d'exécution. Il liste les modifications dans l'ordre, f
 
 ## Phase 1 — `Core.lua` : nouvelles primitives partagées
 
-Ajoute en fin de fichier (après les buttons factories existantes), deux nouveaux helpers réutilisables par Shield et Pocket.
+Ajoute en fin de fichier (après les buttons factories existantes), deux nouveaux helpers réutilisables par Shield.
 
 ### 1.1 `ns.UI.Banner.Create(parent, variant)`
 
-Banner conditionnelle qui s'affiche sous le header pour signaler un état actif. Variants : `"amber"` (Shield armed / Pocket listening), `"green"` (Pocket invited / trade open), `"red"` (réservé futur).
+Banner conditionnelle qui s'affiche sous le header pour signaler un état actif. Variants : `"amber"` (Shield armed), `"green"` (état positif), `"red"` (réservé futur).
 
 ```lua
 -- ns.UI.Banner.Create(parent, variant) -> frame

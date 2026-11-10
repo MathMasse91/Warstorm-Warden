@@ -33,13 +33,13 @@ local CHAPTERS = {
         id = "intro", group = "START HERE", title = "What is Warden?",
         eyebrow = "Chapter 01 \194\183 Start here",
         body = {
-            { kind = "lede", text = "Warden is the in-game UI for WarStormBot. It replaces hundreds of dot-commands and whispers with a visual interface to assemble, spec, command, and trade with your bots." },
+            { kind = "lede", text = "Warden is the in-game UI for WarStormBot. It replaces hundreds of dot-commands and whispers with a visual interface to assemble, spec, gear, and command your bots." },
             { kind = "p",    text = "Instead of memorising commands or whispering every action by hand, Warden gives you four workflows in one window:" },
             { kind = "bullets", items = {
                 "Build raid compositions from presets or a class chip tray.",
                 "Summon and spec bots in one click.",
                 "Command the raid mid-fight from a floating HUD.",
-                "Automate WTS sales to buyer bots.",
+                "Swap specs and re-gear bots from a floating card (WardenMantle).",
             }},
             { kind = "h2",   text = "The four-phase flow" },
             { kind = "p",    text = "Every Warden session goes through the same loop: |em[build]| a comp, |em[spawn]| the bots, |em[command]| them during combat, |em[refine]| the setup when the pull tells you what was missing." },
@@ -75,7 +75,7 @@ local CHAPTERS = {
                 "|kbd[Shift-left]| opens Settings.",
                 "|kbd[Middle-click]| toggles the WardenSword HUD.",
                 "|kbd[Shift+Middle]| toggles WardenShield (|ck[/wsh]|).",
-                "|kbd[Ctrl+Middle]| toggles WardenPocket (|ck[/wp]|).",
+                "|kbd[Ctrl+Middle]| toggles WardenMantle (|ck[/wm]|).",
                 "|kbd[Right-click]| opens this Help tab.",
                 "Drag to orbit the minimap.",
             }},
@@ -86,7 +86,6 @@ local CHAPTERS = {
                 { "/ws",      "Toggle the WardenSword HUD." },
                 { "/wm",      "Toggle WardenMantle (spec-swap HUD)." },
                 { "/wsh",     "Toggle WardenShield." },
-                { "/wp",      "Toggle WardenPocket." },
                 { "/wardenlog", "Open log viewer and debug toggles." },
             }},
             { kind = "h2",   text = "Status footer" },
@@ -211,7 +210,7 @@ local CHAPTERS = {
     },
     {
         id = "mantle", group = "MODULES", title = "WardenMantle",
-        eyebrow = "Modules \194\183 WardenMantle",
+        eyebrow = "Chapter 08 \194\183 Modules",
         body = {
             { kind = "lede", text = "A floating spec-swap card \226\128\148 the successor to feysSpecManager. Target a bot, click a spec tile, done. It also carries the global bot actions: Summon, Autogear, and a gear-rarity re-roll. Built on Warden's own engine." },
             { kind = "h2",   text = "Open and close" },
@@ -237,7 +236,7 @@ local CHAPTERS = {
     },
     {
         id = "shield", group = "MODULES", title = "WardenShield",
-        eyebrow = "Chapter 08 \194\183 Modules",
+        eyebrow = "Chapter 09 \194\183 Modules",
         body = {
             { kind = "lede", text = "Turns a bot's spellbook and surroundings into a clickable list. Instead of memorising spell names, IDs, or exclusion commands, discover and interact with everything visually." },
             { kind = "h2",   text = "What it does" },
@@ -275,76 +274,6 @@ local CHAPTERS = {
                 { "/wsh los",      "Fire |ck[los]| immediately on the targeted (or locked) bot." },
                 { "/wsh spells",   "Fire |ck[spells]| immediately on the targeted (or locked) bot." },
                 { "/wsh help",     "Print the full command reference in chat." },
-            }},
-        },
-    },
-    {
-        id = "pocket", group = "MODULES", title = "WardenPocket",
-        eyebrow = "Chapter 09 \194\183 Modules",
-        body = {
-            { kind = "lede", text = "Automates WTS sales to bot buyers. Drop an item, click WTS, Pocket handles broadcast, listen, rank, invite, trade-request, item placement, and price whisper. Final |ck[AcceptTrade()]| is a protected WoW function and still requires one click." },
-
-            { kind = "h2",   text = "Open and close" },
-            { kind = "p",    text = "|ck[/wp]| toggles. |kbd[Ctrl+Middle-click]| on the minimap button is the keyboard-free equivalent. |kbd[x]| in the header hides. |ck[/wp <text>]| toggles and pre-fills the input field." },
-
-            { kind = "h2",   text = "Item slot" },
-            { kind = "p",    text = "32\194\15732 drop target. Four ways to fill it:" },
-            { kind = "bullets", items = {
-                "Drag an item from your bag.",
-                "Click while holding an item on the cursor.",
-                "Shift-click a bag item with the slot's input field focused.",
-                "|kbd[Ctrl+Right-click]| any bag item while Pocket is open \226\128\148 captures that item into the slot. Plain right-click (equip / use) is unchanged.",
-            }},
-            { kind = "p",    text = "Empty slot shows a gold-dim |kbd[+]| placeholder with the hint |em[drop item or shift-click from bag]|; filled slot shows the actual item icon and name." },
-
-            { kind = "h2",   text = "WTS button" },
-            { kind = "p",    text = "Broadcasts |ck[wts <item link>]| to channel 1 (General). Disabled until a real |ck[|H...]| item link is in the slot. Each click resets offers / timers and re-arms listening." },
-
-            { kind = "h2",   text = "Auto-invite rule" },
-            { kind = "p",    text = "Editable phrase row: |em[Auto-invite after N offers or Ns]|. Whichever cap fires first triggers the invite. Set either to |kbd[0]| to disable that cap. A third trigger \226\128\148 2s of whisper silence \226\128\148 fires regardless. Both fields are |kbd[persisted]| across sessions in |ck[WardenDB.pocket]|." },
-
-            { kind = "h2",   text = "Toggles" },
-            { kind = "bullets", items = {
-                "|kbd[auto-trade on proximity]| \226\128\148 once the invited bot joins the party AND is within trade range (~11y), Pocket automatically sends an |ck[InitiateTrade()]| request. Fires once per invite. Persisted.",
-                "|kbd[fully auto (sell all stacks)]| \226\128\148 on every trade open, places ALL stacks of the WTS item across trade slots 1-6 AND whispers the price multiplied by total item count. Persisted. Final accept still requires a click.",
-            }},
-
-            { kind = "h2",   text = "Offer rows" },
-            { kind = "p",    text = "Sorted descending by price. |kbd[#1]| gets a 28px row with a gold rail accent + star icon. |kbd[#2]| is a slightly smaller semi-bold row. |kbd[#3+]| are 18px muted rows. The hierarchy lets you read the top bidder at a glance even on a 20-offer screen." },
-
-            { kind = "h2",   text = "Banner states" },
-            { kind = "p",    text = "A conditional strip under the header signals the active phase: |kbd[amber LISTENING]| (pulsing blip + countdown / offer count), |kbd[green INVITED]| (bidder + price), |kbd[green TRADE OPEN]| (bot name)." },
-
-            { kind = "h2",   text = "Trade window (docked panel)" },
-            { kind = "p",    text = "When |ck[TRADE_SHOW]| fires while Pocket is visible, the trade UI docks inside the frame with three buttons:" },
-            { kind = "bullets", items = {
-                "|kbd[whisper]| \226\128\148 whisper the total price (|ck[Xg Ys Zc]|) to the trade partner.",
-                "|kbd[trade]| \226\128\148 disabled while inside an open trade (would just trigger 'you are already trading'). Active variant lives in the footer (see below).",
-                "|kbd[accept]| \226\128\148 |ck[SecureActionButton]| that securely clicks |ck[TradeFrameAcceptButton]|. This is the only way to invoke the protected |ck[AcceptTrade()]| function from an addon in 3.3.5. Requires one user click.",
-            }},
-            { kind = "p",    text = "If Pocket is hidden when the trade opens, the same panel floats centered as a fallback." },
-
-            { kind = "h2",   text = "Footer" },
-            { kind = "bullets", items = {
-                "|kbd[clear]| \226\128\148 kicks the invited bot (if any), wipes offers, resets the item slot, and disarms.",
-                "|kbd[open trade]| \226\128\148 appears |em[only]| once the invited bot has actually joined the party AND no trade is open. Sends |ck[InitiateTrade()]| and sets the auto-flow flag so the item is placed + price whispered on |ck[TRADE_SHOW]|.",
-                "|kbd[stop]| \226\128\148 disarms listening without wiping the offer list.",
-                "Middle of the strip shows a live phase summary (e.g. |kbd[5/20 offers \194\183 auto-invite in 22s]|).",
-            }},
-
-            { kind = "h2",   text = "Trade auto-flow on TRADE_SHOW" },
-            { kind = "p",    text = "Triggered when the trade was opened via the |kbd[trade]| panel button, the |kbd[open trade]| footer button, or auto-trade-on-proximity. The addon: (1) auto-places the item (one stack, or all stacks if fully-auto is ON), (2) whispers the total price (unit price \195\151 count), (3) arms the secure accept button. You only click |kbd[accept]| once the bot has placed its gold." },
-
-            { kind = "h2",   text = "Empty state" },
-            { kind = "p",    text = "When idle with no offers the list area shows a |kbd[NO OFFERS YET]| hint with a one-liner reminder of what to do. Disappears as soon as the first whisper lands." },
-
-            { kind = "h2",   text = "Commands and shortcuts" },
-            { kind = "table", rows = {
-                { "/wp",                 "Toggle the HUD." },
-                { "/wp show / hide",     "Explicit visibility." },
-                { "/wp <text>",          "Toggle and pre-fill the input field." },
-                { "Ctrl+Right-click",    "On any bag item while WP is open \226\128\148 captures it into the slot." },
-                { "Ctrl+Middle-click",   "On the minimap button \226\128\148 toggle WardenPocket." },
             }},
         },
     },
@@ -409,8 +338,6 @@ local CHAPTERS = {
                 { "/wardenmantle",  "Long alias for |ck[/wm]|." },
                 { "/wsh",           "Toggle the WardenShield discovery HUD." },
                 { "/wardenshield",  "Long alias for |ck[/wsh]|." },
-                { "/wp",            "Toggle the WardenPocket WTS aggregator." },
-                { "/wardenpocket",  "Long alias for |ck[/wp]|." },
                 { "/wardenlog",     "Log viewer + debug toggles. See the Debug chapter." },
             }},
         },
