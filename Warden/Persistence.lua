@@ -7,20 +7,6 @@ local _, ns = ...
 
 ns.Persistence.DB = nil
 
--- Keys copied from the runtime DB into WardenDB at logout. Runtime-only
--- fields (interval, commandChannel, addPattern) are intentionally absent
--- so a future default change propagates to existing users.
-local COMMIT_SCALARS = {
-    "version", "migratedFromV2", "presetsVersion",
-    "lastComp", "autoRaidDuringBuild", "autoSpec",
-    "bloodlust", "aoe", "burn",
-    "disperseDist", "minimapAngle", "masterScale", "activeTab",
-    "helpLastChapter", "whisperFilter", "initRarity", "chatCompChannel",
-}
-
--- Subtables preserved whole; always written so freshly-added keys survive.
-local COMMIT_SUBTABLES = { "comps", "playerFlags", "sword", "shield", "mantle", "whisperFilters" }
-
 -- ----------------------------------------------------------
 -- Schema init (idempotent)
 -- ----------------------------------------------------------
@@ -259,17 +245,13 @@ life:SetScript("OnEvent", function(_, event)
         for _, cb in ipairs(readyCbs) do pcall(cb) end
         readyCbs = {}
     elseif event == "PLAYER_LOGOUT" then
-        local src = ns.Persistence.DB
-        if not src then return end
-        if ns.Debug then ns.Debug("persist", "PLAYER_LOGOUT: committing DB") end
-        WardenDB = WardenDB or {}
-        for _, k in ipairs(COMMIT_SCALARS) do
-            if src[k] ~= nil then WardenDB[k] = src[k] end
-        end
-        for _, k in ipairs(COMMIT_SUBTABLES) do
-            WardenDB[k] = src[k] or {}
-        end
-        WardenDB.density = nil
+        -- ns.Persistence.DB IS WardenDB (initDB returns it), so everything is
+        -- already in the SavedVariable. Just strip the runtime-only keys,
+        -- re-seeded every login, so a future default change still lands.
+        local db = WardenDB
+        if not db then return end
+        if ns.Debug then ns.Debug("persist", "PLAYER_LOGOUT: stripping runtime keys") end
+        db.interval, db.commandChannel, db.addPattern, db.density = nil, nil, nil, nil
     end
 end)
 

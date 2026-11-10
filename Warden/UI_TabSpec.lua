@@ -313,16 +313,7 @@ local function rebuildTilesFor(classToken)
             end
             fn(targetName)  -- pass resolved name so mouseover works, not just hard target
 
-            if targetGUID and ns.Engine and ns.Engine.state and ns.Engine.state.assignedSpecs then
-                local prev = ns.Engine.state.assignedSpecs[targetGUID] or {}
-                ns.Engine.state.assignedSpecs[targetGUID] = {
-                    name       = targetName,
-                    spec       = specName,
-                    classToken = classToken,
-                    opt1       = prev.opt1,
-                    opt2       = prev.opt2,
-                }
-            end
+            ns.Engine.TrackSpec(targetGUID, targetName, specName, classToken)
             ns.MsgInfo(string.format("Sent `talents spec %s` -> %s.",
                 specName, ns.ColorClass(classToken, targetName)))
 
@@ -619,6 +610,9 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     histPop:SetScript("OnLeave", function(self)
         -- Delayed hide so a child-button click registers first.
         self:SetScript("OnUpdate", function(s, e)
+            -- Moving onto a child row fires our OnLeave too: keep it open
+            -- while the cursor is anywhere over the popup.
+            if MouseIsOver(s) then s._t = 0; return end
             s._t = (s._t or 0) + (e or 0)
             if s._t > 0.15 then s._t = 0; s:SetScript("OnUpdate", nil); s:Hide() end
         end)
@@ -674,34 +668,13 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     biLbl:SetText("BOT INIT")
     biLbl:SetTextColor(0.72, 0.58, 0.21, 1)
 
-    local rarityDrop = CreateFrame("Frame", "WardenSpecRarityDrop", cardPanel.content, "UIDropDownMenuTemplate")
+    local rarityDrop = ns.UI.RarityDropdown("WardenSpecRarityDrop", cardPanel.content, 90)
     rarityDrop:SetPoint("TOPRIGHT", biLbl, "BOTTOMRIGHT", 14, -2)
-    ns.UI.Dropdown.style(rarityDrop, 90)
-    UIDropDownMenu_Initialize(rarityDrop, function()
-        for _, r in ipairs(ns.Data.RARITIES) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text  = ns.Data.RarityText(r)
-            info.value = r
-            info.checked = (ns.Persistence.GetInitRarity() == r)
-            info.func  = function(self)
-                ns.Persistence.SetInitRarity(self.value)
-                UIDropDownMenu_SetText(rarityDrop, ns.Data.RarityText(self.value))
-            end
-            UIDropDownMenu_AddButton(info)
-        end
-    end)
-    UIDropDownMenu_SetText(rarityDrop, ns.Data.RarityText(ns.Persistence.GetInitRarity()))
-    -- Re-sync on show: the pick may have changed in WardenMantle meanwhile.
-    rarityDrop:HookScript("OnShow", function(self)
-        UIDropDownMenu_SetText(self, ns.Data.RarityText(ns.Persistence.GetInitRarity()))
-    end)
 
     local levelBtn = ns.UI.Button.gold(cardPanel.content, "Re-gear Bots", 90, 20)
     levelBtn:SetPoint("TOPRIGHT", rarityDrop, "BOTTOMRIGHT", -16, 0)
     levelBtn:SetScript("OnClick", function()
-        -- Per-bot `init=<rarity> <name> <spec>`: keeps each tracked bot's
-        -- spec (a bare init re-rolls a random one).
-        ns.Engine.InitBots(ns.Persistence.GetInitRarity())
+        ns.Engine.Regear()  -- every bot, keeping each tracked spec
     end)
 
     -- U9 tooltips for the action row + bot-init control.
@@ -750,6 +723,5 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     refreshForTarget()
 end
 
-function ns.UI.Tabs.Spec.OnShow(pane)
-    refreshForTarget()
-end
+-- No Tabs.Spec.OnShow: the pane's own OnShow hook (BuildInto) refreshes,
+-- and Master calling both ran refreshForTarget twice per tab switch.

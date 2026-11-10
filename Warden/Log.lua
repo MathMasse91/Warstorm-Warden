@@ -263,4 +263,3 @@ SlashCmdList["WARDENLOG"] = function(args)
     end
 end
 
-push("INFO", "Warden Log.lua loaded")

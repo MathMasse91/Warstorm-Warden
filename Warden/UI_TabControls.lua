@@ -53,10 +53,9 @@ local DISPERSE_VALUES = { 5, 7, 10, 15, 20 }
 -- ----------------------------------------------------------
 -- Helpers
 -- ----------------------------------------------------------
-local function send(msg, channel)
-    local chan = channel or ns.Channel()
-    if ns.DebugF then ns.DebugF("controls", "send %q -> %s", tostring(msg), tostring(chan)) end
-    SendChatMessage(msg, chan)
+local function send(msg)
+    if ns.DebugF then ns.DebugF("controls", "send %q -> %s", tostring(msg), ns.Channel()) end
+    ns.Broadcast(msg)
 end
 
 local addTooltip = ns.UI.Tooltip.Attach
@@ -419,13 +418,11 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
                 local e = UIDropDownMenu_CreateInfo()
                 e.text, e.notCheckable = s:sub(1, 1):upper() .. s:sub(2) .. " (PvE)", true
                 e.func = function()
-                    SendChatMessage("talents spec " .. s .. " pve", "WHISPER", nil, targetName)
+                    -- Through Engine (human-player guard); tracked as the same
+                    -- "<spec> pve" string the Build / Spec tab store.
+                    ns.Engine.WhisperNow(targetName, "talents spec " .. s .. " pve")
                     ns.MsgInfo(string.format("Sent `talents spec %s pve` to %s.", s, targetName))
-                    if ns.Engine and ns.Engine.state and targetGUID then
-                        ns.Engine.state.assignedSpecs[targetGUID] = {
-                            name = targetName, spec = s, classToken = classTok,
-                        }
-                    end
+                    ns.Engine.TrackSpec(targetGUID, targetName, s .. " pve", classTok)
                 end
                 UIDropDownMenu_AddButton(e)
             end
@@ -484,10 +481,8 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
     local cRowGap  = 4
 
     local function sendAddClass(cmdToken, label)
-        local db   = ns.Persistence and ns.Persistence.DB
-        local chan = (db and db.commandChannel) or "SAY"
-        SendChatMessage(".warstormbot bot addclass " .. cmdToken, chan)
-        ns.MsgInfo("Summoned 1 " .. label .. " (" .. chan .. ").")
+        ns.Engine.SendNow(".warstormbot bot addclass " .. cmdToken)
+        ns.MsgInfo("Summoned 1 " .. label .. ".")
     end
 
     for ri, row in ipairs(CLASS_ROWS) do

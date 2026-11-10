@@ -190,7 +190,8 @@ local function layoutSpecRow(entries, class, modeLabel, topY, label)
 
         t.cap:SetText(ns.Data.SpecCaption(e.base))
         ns.UI.Tooltip.Attach(t, ns.Data.SpecCaption(e.base) .. " (" .. modeLabel .. ")",
-            "Whisper talents spec to " .. (resolveTarget() or "target") .. ".", "ANCHOR_TOP")
+            function() return "Whisper talents spec to " .. (resolveTarget() or "target") .. "." end,
+            "ANCHOR_TOP")
 
         local spec = e.spec
         t:SetScript("OnClick", function()
@@ -211,16 +212,7 @@ local function layoutSpecRow(entries, class, modeLabel, topY, label)
             end
             fn(name, true)  -- immediate=true: un-throttled whisper (no WM button throttles)
 
-            if guid and ns.Engine and ns.Engine.state and ns.Engine.state.assignedSpecs then
-                local prev = ns.Engine.state.assignedSpecs[guid] or {}
-                ns.Engine.state.assignedSpecs[guid] = {
-                    name       = name,
-                    spec       = spec,
-                    classToken = class,
-                    opt1       = prev.opt1,
-                    opt2       = prev.opt2,
-                }
-            end
+            ns.Engine.TrackSpec(guid, name, spec, class)
             ns.MsgInfo(string.format("Sent `talents spec %s` -> %s.",
                 spec, ns.ColorClass(class, name)))
         end)
@@ -308,44 +300,14 @@ local function buildBody()
     -- through Engine.SendNow (un-throttled: fires INSTANTLY, keeps the
     -- no-direct-SendChatMessage invariant).
     -- The label is dropped (the rarity + RB tooltip carry the meaning).
-    local rarityDrop = CreateFrame("Frame", "WardenMantleRarityDrop", frame, "UIDropDownMenuTemplate")
-    ns.UI.Dropdown.style(rarityDrop, 96)
-    UIDropDownMenu_Initialize(rarityDrop, function()
-        for _, r in ipairs(ns.Data.RARITIES) do
-            local info = UIDropDownMenu_CreateInfo()
-            info.text  = ns.Data.RarityText(r)
-            info.value = r
-            info.checked = (ns.Persistence.GetInitRarity() == r)
-            info.func  = function(self)
-                ns.Persistence.SetInitRarity(self.value)
-                UIDropDownMenu_SetText(rarityDrop, ns.Data.RarityText(self.value))
-            end
-            UIDropDownMenu_AddButton(info)
-        end
-    end)
-    UIDropDownMenu_SetText(rarityDrop, ns.Data.RarityText(ns.Persistence.GetInitRarity()))
-    -- Re-sync on show: the pick may have changed in the Spec tab meanwhile.
-    rarityDrop:HookScript("OnShow", function(self)
-        UIDropDownMenu_SetText(self, ns.Data.RarityText(ns.Persistence.GetInitRarity()))
-    end)
-    frame.rarityDrop = rarityDrop
+    frame.rarityDrop = ns.UI.RarityDropdown("WardenMantleRarityDrop", frame, 96)
 
     -- Compact "RB" button (was "ResetBot"): label stays tiny to shrink the
     -- card's footprint; the full meaning shows in a hover tooltip.
     local resetBtn = ns.UI.Button.gold(frame, "RB", 30, 20)
     resetBtn:SetScript("OnClick", function()
-        local rarity = ns.Persistence.GetInitRarity()
         local name, _, guid = resolveTarget()
-        if not name then
-            ns.Engine.InitBots(rarity)  -- no bot targeted: whole group
-            return
-        end
-        -- Gear + spec in one command; without the spec the server re-rolls it.
-        local a = guid and ns.Engine.state.assignedSpecs[guid]
-        local cmd = ns.Engine.InitCommand(rarity, name, a and a.spec)
-        local chan = (db() and db().commandChannel) or "SAY"
-        ns.Engine.SendNow(cmd, chan)
-        ns.MsgInfo(string.format("Sent `%s` (%s).", cmd, chan))
+        ns.Engine.Regear(name, guid)  -- no target: whole group
     end)
     ns.UI.Tooltip.Attach(resetBtn, "Re-gear bot",
         "Sends `.warstormbot bot init=<rarity> <name> <spec>` to the targeted bot (rarity from the dropdown, remembered; spec = its tracked spec). No target: every bot. Don't Autogear after: it re-gears at epic.",

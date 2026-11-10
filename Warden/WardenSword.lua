@@ -125,30 +125,30 @@ local function buildMovementGrid(parent)
     return g
 end
 
+-- AoE / Burn label color follows db.aoe / db.burn (gold = on), so a flip
+-- from the Controls tab shows here too (called from the 0.5s ticker).
+local function paintToggles()
+    local d, btns = db(), bodyWidgets.strategyBtns
+    if not d or not btns then return end
+    for i, key in ipairs({ "aoe", "burn" }) do
+        local fs = btns[i] and btns[i]:GetFontString()
+        if fs then
+            if d[key] then fs:SetTextColor(1.00, 0.82, 0.00)
+            else fs:SetTextColor(0.72, 0.58, 0.21) end
+        end
+    end
+end
+
 local function buildStrategyRow(parent)
     local g = CreateFrame("Frame", nil, parent)
 
     local aoe = ns.UI.Button.stone(g, "AoE", 60, 22)
     tagRim(aoe, ns.Tokens.stone_rim)
-    aoe:SetScript("OnClick", function(self)
-        local on = fireAction("aoe", self)
-        local fs = self:GetFontString()
-        if fs then
-            if on then fs:SetTextColor(1.00, 0.82, 0.00)
-            else fs:SetTextColor(0.72, 0.58, 0.21) end
-        end
-    end)
+    aoe:SetScript("OnClick", function(self) fireAction("aoe", self); paintToggles() end)
 
     local burn = ns.UI.Button.stone(g, "Burn", 60, 22)
     tagRim(burn, ns.Tokens.stone_rim)
-    burn:SetScript("OnClick", function(self)
-        local on = fireAction("burn", self)
-        local fs = self:GetFontString()
-        if fs then
-            if on then fs:SetTextColor(1.00, 0.82, 0.00)
-            else fs:SetTextColor(0.72, 0.58, 0.21) end
-        end
-    end)
+    burn:SetScript("OnClick", function(self) fireAction("burn", self); paintToggles() end)
 
     local skull = ns.UI.Button.stone(g, "Skull", 60, 22)
     tagRim(skull, ns.Tokens.stone_rim)
@@ -204,7 +204,7 @@ local function buildBloodlust(parent)
     tagRim(b, ns.Tokens.red_btn)
     b:SetScript("OnClick", function(self)
         fireAction("bl", self)
-        if ns.WardenSword.RefreshBLButton then ns.WardenSword.RefreshBLButton() end
+        ns.WardenSword.RefreshBLButton()
     end)
     bodyWidgets.bloodlust     = g
     bodyWidgets.bloodlustBtn  = b
@@ -409,7 +409,8 @@ local function build()
         if self._tick < 0.5 then return end
         self._tick = 0
         ns.WardenSword.RefreshStatus()
-        if ns.WardenSword.RefreshBLButton then ns.WardenSword.RefreshBLButton() end
+        ns.WardenSword.RefreshBLButton()
+        paintToggles()
     end)
 
     -- Combat hook: auto-show on combat start when the user opted in.

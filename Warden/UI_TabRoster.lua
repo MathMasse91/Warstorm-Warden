@@ -342,13 +342,7 @@ local function populateSpecDropdown(row)
             info.func  = function(self)
                 row.spec = self.value
                 UIDropDownMenu_SetText(row.specDrop, colorClass(row.classToken, self.value))
-                if row.guid then
-                    local prev = ns.Engine.state.assignedSpecs[row.guid] or {}
-                    ns.Engine.state.assignedSpecs[row.guid] = {
-                        name = row.name, spec = self.value, classToken = row.classToken,
-                        opt1 = prev.opt1, opt2 = prev.opt2,
-                    }
-                end
+                ns.Engine.TrackSpec(row.guid, row.name, self.value, row.classToken)
                 -- Same guards as the Re-Spec buttons: never whisper yourself
                 -- or a character flagged as a human player.
                 if not row.name or UnitIsUnit("player", row.name) then return end
@@ -356,7 +350,7 @@ local function populateSpecDropdown(row)
                     ns.MsgWarn(row.name .. " is flagged as a player - not re-spec'd.")
                     return
                 end
-                local prev = ns.Engine.state.assignedSpecs[row.guid] or {}
+                local prev = ns.Engine.Tracked(row.guid) or {}
                 whisperSpec(row.name, self.value, row.classToken, prev.opt1, prev.opt2)
             end
             UIDropDownMenu_AddButton(info)
@@ -413,16 +407,18 @@ local function rebuild()
     end
 
     local groups = { tank = {}, heal = {}, melee = {}, ranged = {} }
+    local members = 0  -- header count: real members, not filter survivors
     for idx, unit in ipairs(units) do
         local row = rows[idx]
         row._unitId = unit
         if UnitExists(unit) and UnitIsPlayer(unit) then
+            members = members + 1
             row.name         = UnitName(unit) or "?"
             row.guid         = UnitGUID(unit)
             local _, cls     = UnitClass(unit)
             row.classToken   = cls or ""
 
-            local tracked = row.guid and ns.Engine.state.assignedSpecs[row.guid]
+            local tracked = ns.Engine.Tracked(row.guid)
             if tracked and tracked.spec then
                 row.spec = tracked.spec
             else
@@ -637,14 +633,9 @@ local function rebuild()
                         ns.MsgWarn(row.name .. " is flagged as a human player - skipping.")
                         return
                     end
-                    local prev = row.guid and ns.Engine.state.assignedSpecs[row.guid] or {}
+                    local prev = ns.Engine.Tracked(row.guid) or {}
                     whisperSpec(row.name, row.spec, row.classToken, prev.opt1, prev.opt2)
-                    if row.guid then
-                        ns.Engine.state.assignedSpecs[row.guid] = {
-                            name = row.name, spec = row.spec, classToken = row.classToken,
-                            opt1 = prev.opt1, opt2 = prev.opt2,
-                        }
-                    end
+                    ns.Engine.TrackSpec(row.guid, row.name, row.spec, row.classToken)
                 end)
                 -- Disable Re-Spec on the player's own row AND on anyone
                 -- flagged as a human player (FEATURE-02). Dimmed alpha makes
@@ -674,8 +665,7 @@ local function rebuild()
     content:SetHeight(math.max(10, -y + 6))
 
     if frame.headerCount then
-        local tot = totalCounts.tank + totalCounts.heal
-                  + totalCounts.melee + totalCounts.ranged
+        local tot = members
         frame.headerCount:SetText(string.format("roster - %d raid member%s",
             tot, tot == 1 and "" or "s"))
     end
@@ -764,12 +754,12 @@ function ns.UI.Tabs.Roster.BuildInto(pane)
             -- rows only show a guessed fallback spec, which could flip a
             -- healer or tank to DPS, so they're left alone.
             if r.frame:IsShown() and r.name and r.spec and r.guid
-               and ns.Engine.state.assignedSpecs[r.guid]
+               and ns.Engine.Tracked(r.guid)
                and not UnitIsUnit("player", r.name) then
                 if ns.Persistence.IsPlayerName(r.name) then
                     skipped = skipped + 1
                 else
-                    local prev = ns.Engine.state.assignedSpecs[r.guid] or {}
+                    local prev = ns.Engine.Tracked(r.guid) or {}
                     whisperSpec(r.name, r.spec, r.classToken, prev.opt1, prev.opt2)
                     n = n + 1
                 end
@@ -792,7 +782,7 @@ function ns.UI.Tabs.Roster.BuildInto(pane)
                 if ns.Persistence.IsPlayerName(r.name) then
                     skipped = skipped + 1
                 else
-                    local prev = ns.Engine.state.assignedSpecs[r.guid] or {}
+                    local prev = ns.Engine.Tracked(r.guid) or {}
                     whisperSpec(r.name, r.spec, r.classToken, prev.opt1, prev.opt2)
                     n = n + 1
                 end
@@ -819,7 +809,5 @@ function ns.UI.Tabs.Roster.BuildInto(pane)
     frame:SetScript("OnShow", rebuild)
 end
 
-function ns.UI.Tabs.Roster.OnShow(pane)
-    if not built then return end
-    rebuild()
-end
+-- No Tabs.Roster.OnShow: the pane's OnShow above already rebuilds, and
+-- Master calling both rebuilt twice per tab switch.

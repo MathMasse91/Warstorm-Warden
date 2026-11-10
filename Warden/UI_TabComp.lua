@@ -361,12 +361,16 @@ buildSlotWidget = function(parent, index)
         local dstIdx = focus and focus.__wardenSlotIndex
         local srcIdx = state.drag.srcIdx
 
-        if dstIdx and dstIdx ~= srcIdx then
+        if dstIdx and dstIdx == srcIdx then
+            -- Tiny drag released on its own slot: no-op (OnDragStop fires
+            -- before OnMouseUp, so this must not fall through to drag-out).
+            state.drag = nil
+        elseif dstIdx then
             -- Cursor was over a real slot -> let the shared helper do the
             -- swap (for slot drags) or the new assignment (for chip drags).
             state.assignDragToSlot(dstIdx)
         elseif srcIdx == self.index then
-            -- Slot drag released on empty canvas / same slot -> unassign.
+            -- Slot drag released on empty canvas -> unassign.
             state.slots[self.index] = nil
             if state.selected == self.index then state.selected = nil end
             ns.MsgInfo(string.format("Removed slot %d via drag-out.", self.index))
@@ -2241,12 +2245,11 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
 
     importBtn:SetScript("OnClick", function() StaticPopup_Show("WARDEN_COMP_IMPORT") end)
     exportBtn:SetScript("OnClick", function()
-        local s = exportCompString()
-        -- Empty grid => header ends with "||"-style prefix with no slot tokens.
-        if not s:find(";", 1, true) and not s:find("=", 1, true) then
+        if not compHasSlots() then
             ns.MsgWarn("Grid is empty - nothing to export.")
             return
         end
+        local s = exportCompString()
         local p = StaticPopup_Show("WARDEN_COMP_EXPORT")
         if p then
             p.data = s

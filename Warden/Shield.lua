@@ -428,19 +428,14 @@ local function clickExclusion(item, idx)
         ns.MsgWarn(state.target .. " is flagged as a human player - skipping.")
         return
     end
-    SendChatMessage("ss -" .. item.id, "WHISPER", nil, state.target)
+    ns.Engine.WhisperNow(state.target, "ss -" .. item.id)
     untrackExclusion(item.id)
     ns.MsgInfo(string.format("Removed `%s` (id %d) from %s's exclusions.",
         item.name or "?", item.id or 0, state.target))
     if ns.DebugF then
         ns.DebugF("shield", "unban id=%d name=%q", item.id or 0, item.name or "?")
     end
-    if state.exclusionsBtn then
-        local lbl = state.exclusionsBtn:GetFontString()
-        local s = shieldDB(); local n = (s and s.exclusions) and #s.exclusions or 0
-        if lbl then lbl:SetText("Exclusions \194\183 " .. n) end
-    end
-    refreshList()
+    refreshList()  -- also repaints the exclusions counter
 end
 
 clickLine = function(idx)
@@ -522,7 +517,7 @@ clickLine = function(idx)
         return
     end
 
-    SendChatMessage(cmd, "WHISPER", nil, target)
+    ns.Engine.WhisperNow(target, cmd)
     ns.MsgInfo(string.format("Sent `%s` to %s.", cmd, target))
     if ns.DebugF then
         ns.DebugF("shield", "click idx=%d action=%s mode=%s payload=%q -> %s",
@@ -530,13 +525,7 @@ clickLine = function(idx)
     end
 
     if actionMode == "ban" or actionMode == "unban" then
-        local s = shieldDB()
-        local n = (s and s.exclusions) and #s.exclusions or 0
-        if state.exclusionsBtn then
-            local lbl = state.exclusionsBtn:GetFontString()
-            if lbl then lbl:SetText("Exclusions \194\183 " .. n) end
-        end
-        refreshList()
+        refreshList()  -- also repaints the exclusions counter
     end
 
     local row = state.rowFrames[idx]
@@ -941,7 +930,7 @@ local function startCapture(mode)
 
     armWhisper()
     armCountdown()
-    SendChatMessage(mode, "WHISPER", nil, name)
+    ns.Engine.WhisperNow(name, mode)
     ns.MsgInfo(string.format("`%s` -> %s (listening %ds)", mode, name, sec))
     refreshAll()
 end

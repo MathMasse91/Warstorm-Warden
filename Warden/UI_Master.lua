@@ -374,14 +374,15 @@ end
 -- ----------------------------------------------------------
 -- Public API
 -- ----------------------------------------------------------
-local function openAtLastTab()
+-- idx (optional) opens that tab instead of the last active one.
+local function openAtLastTab(idx)
     if not frame then
         if ns.Debug then ns.Debug("master", "buildFrame (first open)") end
         buildFrame()
     end
     frame:Show()
     local db  = ns.Persistence.DB
-    local tab = (db and type(db.activeTab) == "number" and db.activeTab) or 1
+    local tab = idx or (db and type(db.activeTab) == "number" and db.activeTab) or 1
     if tab < 1 or tab > #TAB_DEFS then tab = 1 end
     if ns.DebugF then
         ns.DebugF("master", "openAtLastTab: tab=%d shownAfterShow=%s",
@@ -390,7 +391,6 @@ local function openAtLastTab()
     showTab(tab)
 end
 
-function ns.UI.Master.Show() openAtLastTab() end
 
 -- =====================================================================
 -- "Hide is protected in combat" workaround.
@@ -472,7 +472,7 @@ local function tryHide(reason)
     return false
 end
 
-local function tryShow(reason)
+local function tryShow(reason, idx)
     -- First-ever show of the session: the frame hasn't been built yet.
     -- Route through openAtLastTab() which builds the frame + applies
     -- the last active tab. Returning false here (previous behavior)
@@ -482,7 +482,7 @@ local function tryShow(reason)
     -- openAtLastTab() builds the frame as a side effect, after which
     -- every subsequent left-click found `frame` non-nil and worked.
     if not frame then
-        openAtLastTab()
+        openAtLastTab(idx)
         return true
     end
     pendingHideAtRegen = false
@@ -494,7 +494,9 @@ local function tryShow(reason)
     frame:SetAlpha(1)
     frame:EnableMouse(true)
     if not frame:IsShown() then
-        openAtLastTab()
+        openAtLastTab(idx)
+    elseif idx then
+        showTab(idx)
     end
     if ns.DebugF then ns.DebugF("master", "tryShow ok (%s)", reason) end
     return true
@@ -556,15 +558,14 @@ function ns.UI.Master.Hide()
     if frame then tryHide("Master.Hide") end
 end
 
-function ns.UI.Master.IsShown()
-    return frame and frame:IsShown()
-end
+-- Both go through tryShow so a combat soft-hide (alpha 0 / off-screen) is
+-- undone instead of "opening" an invisible frame.
+function ns.UI.Master.Show() tryShow("Show") end
 
 function ns.UI.Master.ShowTab(key)
     for i, def in ipairs(TAB_DEFS) do
         if def.key == key then
-            ns.UI.Master.Show()
-            showTab(i)
+            tryShow("ShowTab", i)
             return
         end
     end

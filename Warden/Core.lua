@@ -85,21 +85,29 @@ end
 -- Whisper `cmd` to every raid/party member matching `classToken`.
 -- Used for per-class strategy toggles (e.g. `nc -bloodlust` only to shamans)
 -- because the generic RAID/PARTY broadcast doesn't reliably flip the strategy.
-function ns.WhisperClass(classToken, cmd)
+-- Group unit ids: "raid1".."raidN" in a raid, else "party1".."partyN"
+-- (plus "player" first when includePlayer, party only - in a raid the
+-- player already has a raidN slot).
+function ns.GroupUnits(includePlayer)
     local units = {}
     if GetNumRaidMembers() > 0 then
         for i = 1, GetNumRaidMembers() do units[#units + 1] = "raid" .. i end
     else
+        if includePlayer then units[1] = "player" end
         for i = 1, GetNumPartyMembers() do units[#units + 1] = "party" .. i end
     end
+    return units
+end
+
+function ns.WhisperClass(classToken, cmd)
     local count = 0
-    for _, u in ipairs(units) do
+    for _, u in ipairs(ns.GroupUnits()) do
         if UnitExists(u) and UnitIsPlayer(u) and not UnitIsUnit(u, "player") then
             local _, cls = UnitClass(u)
             if cls == classToken then
                 local name = UnitName(u)
-                if name then
-                    SendChatMessage(cmd, "WHISPER", nil, name)
+                if name and not ns.Persistence.IsPlayerName(name) then
+                    ns.Engine.WhisperNow(name, cmd)  -- Engine owns chat sends
                     count = count + 1
                 end
             end
@@ -355,19 +363,62 @@ end
 -- OnEnter=>SetOwner+SetText+AddLine+Show / OnLeave=>Hide across tabs.
 -- =====================================================================
 ns.UI.Tooltip = ns.UI.Tooltip or {}
+-- Hooks (not SetScript) so a frame's own hover visuals survive, and only
+-- once per frame: re-attaching (e.g. on every refresh) just swaps the text.
+-- body may be a function returning the text, for live content.
+local function tipEnter(self)
+    GameTooltip:SetOwner(self, self._tipAnchor)
+    GameTooltip:SetFrameStrata("TOOLTIP")
+    GameTooltip:SetText(self._tipTitle, 1, 1, 1)
+    local body = self._tipBody
+    if type(body) == "function" then body = body(self) end
+    if body and body ~= "" then
+        GameTooltip:AddLine(body, 0.9, 0.9, 0.9, true)
+    end
+    GameTooltip:Show()
+end
+local function tipLeave() GameTooltip:Hide() end
+
 function ns.UI.Tooltip.Attach(frame, title, body, anchor)
     if not frame or not title then return end
-    anchor = anchor or "ANCHOR_RIGHT"
-    frame:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, anchor)
-        GameTooltip:SetFrameStrata("TOOLTIP")
-        GameTooltip:SetText(title, 1, 1, 1)
-        if body and body ~= "" then
-            GameTooltip:AddLine(body, 0.9, 0.9, 0.9, true)
+    frame._tipTitle, frame._tipBody = title, body
+    frame._tipAnchor = anchor or "ANCHOR_RIGHT"
+    if not frame._tipHooked then
+        frame._tipHooked = true
+        frame:HookScript("OnEnter", tipEnter)
+        frame:HookScript("OnLeave", tipLeave)
+    end
+end
+
+-- =====================================================================
+-- Shared gear-rarity dropdown (Spec tab BOT INIT + WardenMantle). The pick is
+-- saved in Persistence and every instance's label follows it live.
+-- =====================================================================
+local rarityDrops = {}
+local function paintRarityDrops()
+    local txt = ns.Data.RarityText(ns.Persistence.GetInitRarity())
+    for _, d in ipairs(rarityDrops) do UIDropDownMenu_SetText(d, txt) end
+end
+
+function ns.UI.RarityDropdown(globalName, parent, width)
+    local drop = CreateFrame("Frame", globalName, parent, "UIDropDownMenuTemplate")
+    ns.UI.Dropdown.style(drop, width)
+    UIDropDownMenu_Initialize(drop, function()
+        for _, r in ipairs(ns.Data.RARITIES) do
+            local info = UIDropDownMenu_CreateInfo()
+            info.text    = ns.Data.RarityText(r)
+            info.value   = r
+            info.checked = (ns.Persistence.GetInitRarity() == r)
+            info.func    = function(self)
+                ns.Persistence.SetInitRarity(self.value)
+                paintRarityDrops()
+            end
+            UIDropDownMenu_AddButton(info)
         end
-        GameTooltip:Show()
     end)
-    frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    rarityDrops[#rarityDrops + 1] = drop
+    UIDropDownMenu_SetText(drop, ns.Data.RarityText(ns.Persistence.GetInitRarity()))
+    return drop
 end
 
 -- =====================================================================
@@ -395,16 +446,7 @@ function ns.UI.Check.Make(parent, globalName, label, dbTable, key, opts)
             ns.MsgInfo(label .. ": " .. ((dbTable and dbTable[key]) and "ON" or "OFF"))
         end
     end)
-    if opts.tip then
-        cb:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetFrameStrata("TOOLTIP")
-            GameTooltip:SetText(label, 1, 1, 1)
-            GameTooltip:AddLine(opts.tip, 0.9, 0.9, 0.9, true)
-            GameTooltip:Show()
-        end)
-        cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    end
+    if opts.tip then ns.UI.Tooltip.Attach(cb, label, opts.tip) end
     return cb
 end
 

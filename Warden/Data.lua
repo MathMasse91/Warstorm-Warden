@@ -77,12 +77,10 @@ ns.Data.DEFAULT_SPEC_PVE = {
 local function whisperSpec(specServerName, targetName, immediate)
     local target = targetName or UnitName("target")
     if not target then return end
-    if immediate and ns.Engine and ns.Engine.WhisperNow then
+    if immediate then
         ns.Engine.WhisperNow(target, "talents spec " .. specServerName)
-    elseif ns.Engine and ns.Engine.Queue then
-        ns.Engine.Queue("talents spec " .. specServerName, "WHISPER", target)
     else
-        SendChatMessage("talents spec " .. specServerName, "WHISPER", nil, target)
+        ns.Engine.Queue("talents spec " .. specServerName, "WHISPER", target)
     end
 end
 

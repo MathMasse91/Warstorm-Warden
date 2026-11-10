@@ -702,7 +702,9 @@ watcher:SetScript("OnEvent", function()
     local s  = ns.Engine.state
     local db = ns.Persistence.DB
     if not s.buildActive then return end
-    if db and db.autoSpec == false then return end
+    -- Create (deferSpecs) needs every joiner recorded even with autoSpec off:
+    -- its init carries the spec and its buffs key off the classes present.
+    if db and db.autoSpec == false and not s.deferSpecs then return end
 
     if ns.Engine.IsInRaid() then
         for i = 1, GetNumRaidMembers() do
@@ -967,6 +969,24 @@ function ns.Engine.CancelTimers()
 end
 
 -- ----------------------------------------------------------
+-- Public API: Tracked / TrackSpec - the GUID -> {name, spec, classToken,
+-- opt1, opt2} identity map behind Re-Spec, Re-gear and the Roster. TrackSpec
+-- keeps the previous opt1/opt2 (blessing/aura picks) unless new ones are given.
+-- ----------------------------------------------------------
+function ns.Engine.Tracked(guid)
+    return guid and ns.Engine.state.assignedSpecs[guid] or nil
+end
+
+function ns.Engine.TrackSpec(guid, name, spec, classToken, opt1, opt2)
+    if not guid then return end
+    local prev = ns.Engine.state.assignedSpecs[guid] or {}
+    ns.Engine.state.assignedSpecs[guid] = {
+        name = name, spec = spec, classToken = classToken,
+        opt1 = opt1 or prev.opt1, opt2 = opt2 or prev.opt2,
+    }
+end
+
+-- ----------------------------------------------------------
 -- Public API: InitCommand / InitBots - per-named-bot gear + spec init.
 -- `.warstormbot bot init=<rarity> <name> <spec>` gears the bot at <rarity>
 -- AND applies <spec> server-side in one command. Without the spec the server
@@ -985,8 +1005,7 @@ end
 
 -- Spec Warden knows for a unit: tracked assignment (by GUID) first.
 local function trackedSpec(unit)
-    local guid = UnitGUID(unit)
-    local a = guid and ns.Engine.state.assignedSpecs[guid]
+    local a = ns.Engine.Tracked(UnitGUID(unit))
     return a and a.spec or nil
 end
 
@@ -1019,6 +1038,18 @@ function ns.Engine.InitBots(rarity, specByName)
         tostring(rarity), n, withSpec))
     if ns.LogF then ns.LogF("InitBots: queued init=%s for %d bots (%d with spec)", tostring(rarity), n, withSpec) end
     return n, withSpec
+end
+
+-- Re-gear at the saved rarity. name = one bot (spec from guid's tracked
+-- assignment, sent immediately); no name = every bot (throttled InitBots).
+function ns.Engine.Regear(name, guid)
+    local rarity = ns.Persistence.GetInitRarity()
+    if not name then return ns.Engine.InitBots(rarity) end
+    local a   = ns.Engine.Tracked(guid)
+    local cmd = ns.Engine.InitCommand(rarity, name, a and a.spec)
+    ns.Engine.SendNow(cmd)
+    ns.MsgInfo(string.format("Sent `%s`.", cmd))
+    return 1
 end
 
 -- ----------------------------------------------------------
@@ -1126,7 +1157,12 @@ function ns.Engine.CreateRaid(plan, opts)
 
     -- Give the remove-all a beat to process, then kick off the paced build.
     ns.Engine.After(1.5, function()
-        ns.Engine.StartBuild(plan, { deferSpecs = true })
+        if ns.Engine.StartBuild(plan, { deferSpecs = true }) == 0 then
+            -- Aborted (no plan / nothing to spawn): disarm so the next plain
+            -- Build doesn't fire this stale Create chain on completion.
+            s.onBuildComplete = nil
+            s.deferSpecs      = false
+        end
     end)
 end
 
