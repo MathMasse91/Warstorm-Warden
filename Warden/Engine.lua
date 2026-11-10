@@ -105,11 +105,17 @@ end
 -- re-roll, Autogear) that must fire INSTANTLY - a lone command can't trip the
 -- server anti-spam that the sendQueue throttle guards against. Keeps the
 -- no-direct-SendChatMessage invariant by routing through Engine.
+-- Channel for server dot-commands (.warstormbot ...): db.commandChannel.
+function ns.Engine.CommandChannel()
+    local db = ns.Persistence and ns.Persistence.DB
+    return (db and db.commandChannel) or "SAY"
+end
+
 function ns.Engine.SendNow(msg, channel, target)
     if type(msg) ~= "string" or msg == "" then return end
-    local db = ns.Persistence and ns.Persistence.DB
-    SendChatMessage(msg, channel or (db and db.commandChannel) or "SAY", nil, target)
-    if ns.LogF then ns.LogF("SendNow: '%s' -> %s", msg, channel or "SAY") end
+    channel = channel or ns.Engine.CommandChannel()
+    SendChatMessage(msg, channel, nil, target)
+    if ns.LogF then ns.LogF("SendNow: '%s' -> %s", msg, channel) end
 end
 
 -- ----------------------------------------------------------
@@ -179,7 +185,7 @@ local function sendTick(self, elapsed)
     else
         msg = item
     end
-    SendChatMessage(msg, ch or (db and db.commandChannel) or "SAY", nil, tgt)
+    SendChatMessage(msg, ch or ns.Engine.CommandChannel(), nil, tgt)
     -- Only bot-add commands (bare strings from buildQueues) grow the group.
     -- Routed sends (tables: e.g. a Spec-tab spec whisper queued mid-build)
     -- must not arm the join gate, or the queue stalls ~8s and reports a
@@ -906,7 +912,7 @@ function ns.Engine.InitBots(rarity, specByName)
         if ns.Persistence and ns.Persistence.IsPlayerName
            and ns.Persistence.IsPlayerName(name) then return end
         local spec = (specByName and specByName[name]) or trackedSpec(unit)
-        ns.Engine.Queue(ns.Engine.InitCommand(rarity, name, spec))  -- command channel
+        ns.Engine.Queue(ns.Engine.InitCommand(rarity, name, ns.Data.ServerSpec(spec)))
         n = n + 1
         if spec then withSpec = withSpec + 1 end
     end
@@ -928,7 +934,7 @@ function ns.Engine.Regear(name, guid)
     local rarity = ns.Persistence.GetInitRarity()
     if not name then return ns.Engine.InitBots(rarity) end
     local a   = ns.Engine.Tracked(guid)
-    local cmd = ns.Engine.InitCommand(rarity, name, a and a.spec)
+    local cmd = ns.Engine.InitCommand(rarity, name, ns.Data.ServerSpec(a and a.spec))
     ns.Engine.SendNow(cmd)
     ns.MsgInfo(string.format("Sent `%s`.", cmd))
     return 1
@@ -989,9 +995,7 @@ end
 
 function ns.Engine.CreateRaid(plan, opts)
     opts = opts or {}
-    local s    = ns.Engine.state
-    local db   = ns.Persistence.DB
-    local chan = (db and db.commandChannel) or "SAY"
+    local s = ns.Engine.state
 
     -- Clear any half-finished prior run so hooks/timers don't overlap.
     ns.Engine.CancelTimers()
@@ -1000,7 +1004,7 @@ function ns.Engine.CreateRaid(plan, opts)
 
     DEFAULT_CHAT_FRAME:AddMessage(
         "|cff00ff00[Warden]|r Create: removing existing bots...")
-    ns.Engine.SendNow(".warstormbot bot remove *", chan)
+    ns.Engine.SendNow(".warstormbot bot remove *")
 
     s.onBuildComplete = function()
         local items = {}

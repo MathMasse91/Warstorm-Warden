@@ -456,11 +456,7 @@ local function rebuild()
             -- Count pill - a small framed FontString
             h.pill = CreateFrame("Frame", nil, content)
             h.pill:SetSize(28, 14)
-            h.pill:SetBackdrop({
-                bgFile   = "Interface\\Buttons\\WHITE8x8",
-                edgeFile = "Interface\\Buttons\\WHITE8x8",
-                edgeSize = 1,
-            })
+            h.pill:SetBackdrop(ns.UI.FLAT_BACKDROP)
             h.pill:SetBackdropColor(0.04, 0.03, 0.02, 1)
             h.pill:SetBackdropBorderColor(0.23, 0.18, 0.13, 1)
             h.pillText = h.pill:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")

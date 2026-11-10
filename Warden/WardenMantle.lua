@@ -78,11 +78,7 @@ local function createTile()
     local b = CreateFrame("Button", nil, frame)
     b:EnableMouse(true)
     b:RegisterForClicks("LeftButtonUp")
-    b:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    b:SetBackdrop(ns.UI.FLAT_BACKDROP)
     b:SetBackdropColor(0.04, 0.03, 0.02, 1)
     b:SetBackdropBorderColor(ns.Tokens.gold_rim[1], ns.Tokens.gold_rim[2], ns.Tokens.gold_rim[3], 1)
 
@@ -228,11 +224,7 @@ local function buildBody()
     -- Target portrait
     local p = CreateFrame("Frame", nil, frame)
     p:SetSize(PORTRAIT, PORTRAIT)
-    p:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    p:SetBackdrop(ns.UI.FLAT_BACKDROP)
     p:SetBackdropColor(0.11, 0.08, 0.05, 1)
     p:SetBackdropBorderColor(ns.Tokens.gold_rim[1], ns.Tokens.gold_rim[2], ns.Tokens.gold_rim[3], 1)
     local ptex = p:CreateTexture(nil, "ARTWORK")

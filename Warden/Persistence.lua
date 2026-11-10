@@ -85,12 +85,28 @@ local function initDB()
     if db.pocket ~= nil then db.pocket = nil end
     if db.sword and db.sword.tone ~= nil then db.sword.tone = nil end
 
-    -- Runtime-only defaults (not committed, never persisted).
+    -- Runtime-only defaults: re-seeded every login, stripped at logout.
     db.interval       = 0.90
     db.commandChannel = "SAY"
     db.addPattern     = ".warstormbot bot addclass %s"
 
     return db
+end
+
+-- Adds every default preset missing from db.comps (never overwrites a
+-- user-edited one). Returns how many were added.
+local function seedMissingPresets(db)
+    local n = 0
+    for _, name in ipairs(ns.Data.DEFAULT_PRESET_NAMES or {}) do
+        if type(db.comps[name]) ~= "table" then
+            local comp = ns.Data.BuildDefaultPresetComp(name)
+            if comp then
+                db.comps[name] = comp
+                n = n + 1
+            end
+        end
+    end
+    return n
 end
 
 -- ----------------------------------------------------------
@@ -132,16 +148,7 @@ local function migrateDefaultPresets(db)
     if current < 5 then purgeList(ns.Data.LEGACY_PRESET_NAMES_V4) end
     if lastWasPurged then db.lastComp = "" end
 
-    local seeded = 0
-    for _, name in ipairs(ns.Data.DEFAULT_PRESET_NAMES or {}) do
-        if type(db.comps[name]) ~= "table" then
-            local comp = ns.Data.BuildDefaultPresetComp(name)
-            if comp then
-                db.comps[name] = comp
-                seeded = seeded + 1
-            end
-        end
-    end
+    local seeded = seedMissingPresets(db)
     db.presetsVersion = target
     return seeded, purged
 end
@@ -153,16 +160,7 @@ function ns.Persistence.RestoreDefaultPresets()
     local db = ns.Persistence.DB
     if not db then return 0 end
     db.comps = db.comps or {}
-    local added = 0
-    for _, name in ipairs(ns.Data.DEFAULT_PRESET_NAMES or {}) do
-        if type(db.comps[name]) ~= "table" then
-            local comp = ns.Data.BuildDefaultPresetComp(name)
-            if comp then
-                db.comps[name] = comp
-                added = added + 1
-            end
-        end
-    end
+    local added = seedMissingPresets(db)
     return added
 end
 

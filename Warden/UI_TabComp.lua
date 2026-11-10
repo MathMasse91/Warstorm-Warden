@@ -228,11 +228,7 @@ buildSlotWidget = function(parent, index)
     local f = CreateFrame("Button", "WardenSlot" .. index, parent)
     f:EnableMouse(true)
     f:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    f:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    f:SetBackdrop(ns.UI.FLAT_BACKDROP)
 
     -- Class-color bar across the top
     local bar = f:CreateTexture(nil, "OVERLAY")
@@ -273,11 +269,7 @@ buildSlotWidget = function(parent, index)
     local pBadge = CreateFrame("Frame", nil, f)
     pBadge:SetSize(14, 14)
     pBadge:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -6)
-    pBadge:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    pBadge:SetBackdrop(ns.UI.FLAT_BACKDROP)
     pBadge:SetBackdropColor(0.10, 0.06, 0.02, 1)
     pBadge:SetBackdropBorderColor(0.72, 0.58, 0.21, 1)
     pBadge:Hide()
@@ -681,11 +673,7 @@ local function buildChipWidget(parent, classToken)
     f:EnableMouse(true)
     f:RegisterForClicks("LeftButtonUp")
     f:RegisterForDrag("LeftButton")
-    f:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    f:SetBackdrop(ns.UI.FLAT_BACKDROP)
     f:SetBackdropColor(0.12, 0.10, 0.06, 0.95)
     f:SetBackdropBorderColor(0.16, 0.12, 0.08, 1)
     f:SetSize(70, 22)
@@ -990,16 +978,6 @@ StaticPopupDialogs["WARDEN_COMP_EXPORT"] = {
         self.editBox:SetFocus()
     end,
     EditBoxOnEscapePressed = function(self) self:GetParent():Hide() end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
-
--- Saved-comp delete confirmation. `data` carries the comp name; the OnAccept
--- callback is injected at click-time so the popup doesn't need upvalues into
--- the refreshPresetDropdown closure.
-StaticPopupDialogs["WARDEN_COMP_DELETE"] = {
-    text           = "Delete saved comp '%s'? This cannot be undone.",
-    button1        = YES, button2 = NO,
-    OnAccept       = function(self) if self.onConfirm then self.onConfirm(self.data) end end,
     timeout = 0, whileDead = true, hideOnEscape = true,
 }
 
@@ -1484,16 +1462,6 @@ local function compHasSlots()
     return false
 end
 
--- Confirm before an instance preset replaces a non-empty comp. The actual
--- load closure is passed as `data` and fired on accept. Empty comps skip this
--- and load directly (see the dropdown entry below).
-StaticPopupDialogs["WARDEN_COMP_LOAD_CONFIRM"] = {
-    text         = "Replace the current comp with \"%s\"?\nUnsaved slots will be lost.",
-    button1      = YES, button2 = NO, timeout = 0,
-    whileDead    = true, hideOnEscape = true,
-    OnAccept     = function(_, data) if data then data() end end,
-}
-
 local function refreshPresetDropdown()
     if not state.presetDrop then return end
     UIDropDownMenu_Initialize(state.presetDrop, function()
@@ -1519,7 +1487,8 @@ local function refreshPresetDropdown()
                 -- Confirm only when the current comp is non-empty; empty loads
                 -- replace nothing, so they go straight through.
                 if compHasSlots() then
-                    StaticPopup_Show("WARDEN_COMP_LOAD_CONFIRM", name, nil, doLoad)
+                    ns.UI.Confirm(string.format(
+                        "Replace the current comp with \"%s\"?\nUnsaved slots will be lost.", name), doLoad)
                 else
                     doLoad()
                 end
@@ -1565,32 +1534,6 @@ local function runBuild(plan)
     ns.Engine.StartBuild(plan)
 end
 
--- Safe-summon guard: clicking Build while already in a group/raid kicks off the
--- add/remove churn of StartBuild over your live roster, which can wipe a raid on
--- a stray click. Confirm first. (data carries the plan; OnAccept receives it as
--- the 2nd arg.)
-StaticPopupDialogs["WARDEN_CONFIRM_BUILD"] = {
-    text         = "You're already in a group/raid.\nBuild will re-summon bots over the current roster. Proceed?",
-    button1      = YES, button2 = NO, timeout = 0,
-    whileDead    = true, hideOnEscape = true,
-    OnAccept     = function(_, data) runBuild(data) end,
-}
-
--- Create: one-click ORC-style sequence - remove ALL current bots, paced
--- re-summon of this comp, per-bot `init=<rarity> <name> <spec>` (gear + spec
--- in one server command), then AI strats, BL off, group buffs and world
--- buffs - no autogear (it would re-gear at the server's epic cap) (init-first order from Feryll/Huntriss [DGEN]). Destructive, so
--- always behind a confirm.
-StaticPopupDialogs["WARDEN_CONFIRM_CREATE"] = {
-    text         = "Create raid:\nremoves ALL current bots, re-summons this comp, gears + specs them (init=%s), then strategies + buffs. Proceed?",
-    button1      = YES, button2 = NO, timeout = 0,
-    whileDead    = true, hideOnEscape = true,
-    OnAccept     = function(_, data)
-        if ns.Engine and ns.Engine.CreateRaid then
-            ns.Engine.CreateRaid(data, { initRarity = ns.Persistence.GetInitRarity() })
-        end
-    end,
-}
 
 -- ----------------------------------------------------------
 -- BuildInto
@@ -1746,11 +1689,7 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     -- comp provides that buff and stays a dim red-brown when it's missing.
     -- Reads at a glance; refreshCoverage repaints the tiles (see paintCovCell).
     local covHost = CreateFrame("Frame", nil, sidePanel.content)
-    covHost:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    covHost:SetBackdrop(ns.UI.FLAT_BACKDROP)
     covHost:SetBackdropColor(0.10, 0.08, 0.05, 0.85)
     covHost:SetBackdropBorderColor(0.72, 0.58, 0.21, 0.55) -- gold-dim rim = "its own square"
 
@@ -1785,11 +1724,7 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
             cell:SetPoint("TOPLEFT", covHost, "TOPLEFT",
                 pad + col * (colW + gap),
                 topY - row * (cellH + gap))
-            cell:SetBackdrop({
-                bgFile   = "Interface\\Buttons\\WHITE8x8",
-                edgeFile = "Interface\\Buttons\\WHITE8x8",
-                edgeSize = 1,
-            })
+            cell:SetBackdrop(ns.UI.FLAT_BACKDROP)
             local lbl = cell:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             lbl:SetPoint("CENTER", cell, "CENTER", 0, 0)
             lbl:SetText(item.label)
@@ -1877,7 +1812,7 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
         "ANCHOR_TOP")
 
     -- buildBtn itself is created in the bottom action row (see below); its
-    -- click handler reuses runBuild + WARDEN_CONFIRM_BUILD defined at file scope.
+    -- click handler reuses runBuild defined at file scope.
     state.sidebar.summary = { numLbl = numLbl }
 
     -- ----------------------------------------------------------
@@ -2172,20 +2107,16 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
             ns.MsgWarn(string.format("No saved comp named '%s'.", name))
             return
         end
-        local popup = StaticPopup_Show("WARDEN_COMP_DELETE", name)
-        if popup then
-            popup.data = name
-            popup.onConfirm = function(n)
-                if ns.Persistence.DB and ns.Persistence.DB.comps then
-                    ns.Persistence.DB.comps[n] = nil
-                    if ns.Persistence.DB.lastComp == n then
-                        ns.Persistence.DB.lastComp = nil
-                    end
+        ns.UI.Confirm(string.format("Delete saved comp '%s'? This cannot be undone.", name), function()
+            if ns.Persistence.DB and ns.Persistence.DB.comps then
+                ns.Persistence.DB.comps[name] = nil
+                if ns.Persistence.DB.lastComp == name then
+                    ns.Persistence.DB.lastComp = nil
                 end
-                refreshPresetDropdown()
-                ns.MsgInfo("Deleted comp: " .. n)
             end
-        end
+            refreshPresetDropdown()
+            ns.MsgInfo("Deleted comp: " .. name)
+        end)
     end)
 
     renameBtn:SetScript("OnClick", function()
@@ -2279,15 +2210,19 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     -- auto-moves the player to their [P] slot.
     local createBtn = ns.UI.Button.red(pane, "Create", ACT_BTN_W, ACT_BTN_H)
     createBtn:SetPoint("RIGHT", stopBtn, "LEFT", -ACT_GAP, 0)
-    -- WARDEN_CONFIRM_CREATE popup is defined at file scope (see above).
     createBtn:SetScript("OnClick", function()
         local plan = readPlan()
         if #plan == 0 then ns.MsgErr("Grid is empty - nothing to create."); return end
-        StaticPopup_Show("WARDEN_CONFIRM_CREATE", ns.Persistence.GetInitRarity(), nil, plan)
+        -- Destructive (removes ALL bots; order from Feryll/Huntriss [DGEN],
+        -- see Engine.CreateRaid) -> always behind a confirm.
+        local rarity = ns.Persistence.GetInitRarity()
+        ns.UI.Confirm(string.format("Create raid:\nremoves ALL current bots, re-summons this comp, "
+            .. "gears + specs them (init=%s), then strategies + buffs. Proceed?", rarity),
+            function() ns.Engine.CreateRaid(plan, { initRarity = rarity }) end)
     end)
 
     -- Build: the primary build kickoff, moved down from the sidebar so it sits
-    -- in the action group. Reuses runBuild + WARDEN_CONFIRM_BUILD from above.
+    -- in the action group. Reuses runBuild from above.
     local buildBtn = ns.UI.Button.red(pane, "Build", ACT_BTN_W, ACT_BTN_H)
     buildBtn:SetPoint("RIGHT", createBtn, "LEFT", -ACT_GAP, 0)
     local buildFS = buildBtn:GetFontString()
@@ -2297,7 +2232,9 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
         if ns.DebugF then ns.DebugF("comp", "Build clicked: plan rows=%d", #plan) end
         if #plan == 0 then ns.MsgErr("Grid is empty - nothing to build."); return end
         if (GetNumRaidMembers() > 0) or (GetNumPartyMembers() > 0) then
-            StaticPopup_Show("WARDEN_CONFIRM_BUILD", nil, nil, plan)
+            -- Re-summoning over a live roster can wipe a raid on a stray click.
+            ns.UI.Confirm("You're already in a group/raid.\nBuild will re-summon bots "
+                .. "over the current roster. Proceed?", function() runBuild(plan) end)
             return
         end
         runBuild(plan)

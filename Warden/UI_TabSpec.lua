@@ -219,11 +219,7 @@ local function rebuildTilesFor(classToken)
             tile = CreateFrame("Button", nil, content)
             tile:EnableMouse(true)
             tile:RegisterForClicks("LeftButtonUp")
-            tile:SetBackdrop({
-                bgFile   = "Interface\\Buttons\\WHITE8x8",
-                edgeFile = "Interface\\Buttons\\WHITE8x8",
-                edgeSize = 1,
-            })
+            tile:SetBackdrop(ns.UI.FLAT_BACKDROP)
 
             local name = tile:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             name:SetPoint("TOPLEFT", tile, "TOPLEFT", 8, -8)
@@ -237,11 +233,7 @@ local function rebuildTilesFor(classToken)
             local iconSlot = CreateFrame("Frame", nil, tile)
             iconSlot:SetSize(22, 22)
             iconSlot:SetPoint("TOPRIGHT", tile, "TOPRIGHT", -6, -6)
-            iconSlot:SetBackdrop({
-                bgFile   = "Interface\\Buttons\\WHITE8x8",
-                edgeFile = "Interface\\Buttons\\WHITE8x8",
-                edgeSize = 1,
-            })
+            iconSlot:SetBackdrop(ns.UI.FLAT_BACKDROP)
             iconSlot:SetBackdropColor(0.04, 0.03, 0.02, 1)
             iconSlot:SetBackdropBorderColor(0.23, 0.18, 0.13, 1)
             tile.iconSlot = iconSlot
@@ -336,11 +328,7 @@ local function rebuildTilesFor(classToken)
         local ph = tabState.placeholders[phIdx]
         if not ph then
             ph = CreateFrame("Frame", nil, content)
-            ph:SetBackdrop({
-                bgFile   = "Interface\\Buttons\\WHITE8x8",
-                edgeFile = "Interface\\Buttons\\WHITE8x8",
-                edgeSize = 1,
-            })
+            ph:SetBackdrop(ns.UI.FLAT_BACKDROP)
             ph:SetBackdropColor(0.06, 0.05, 0.03, 0.6)
             ph:SetBackdropBorderColor(0.18, 0.14, 0.10, 1)
             ph.lbl = ph:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -446,11 +434,7 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     badge:SetPoint("BOTTOMRIGHT", portrait, "BOTTOMRIGHT", 8, -6)
     badge:SetFrameStrata(cardPanel:GetFrameStrata())
     badge:SetFrameLevel((portraitBorder:GetFrameLevel() or 0) + 4)
-    badge:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    badge:SetBackdrop(ns.UI.FLAT_BACKDROP)
     badge:SetBackdropColor(0.10, 0.06, 0.02, 1) -- fully opaque dark brown
     badge:SetBackdropBorderColor(0.72, 0.58, 0.21, 1) -- gold-dim
     badge:Hide()
@@ -496,11 +480,7 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
         b:SetSize(w or 80, h or 20)
         b:EnableMouse(true)
         b:RegisterForClicks("AnyUp")
-        b:SetBackdrop({
-            bgFile   = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Buttons\\WHITE8x8",
-            edgeSize = 1,
-        })
+        b:SetBackdrop(ns.UI.FLAT_BACKDROP)
         b:SetBackdropColor(TOK.stone_tile[1], TOK.stone_tile[2], TOK.stone_tile[3], 1)
         b:SetBackdropBorderColor(TOK.stone_rim[1], TOK.stone_rim[2], TOK.stone_rim[3], 1)
         local fs = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -545,11 +525,7 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     histPop:SetSize(140, 10)
     histPop:SetPoint("TOPLEFT", histBtn, "BOTTOMLEFT", 0, -2)
     histPop:SetFrameStrata("DIALOG")
-    histPop:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    histPop:SetBackdrop(ns.UI.FLAT_BACKDROP)
     histPop:SetBackdropColor(0.10, 0.06, 0.02, 1)
     histPop:SetBackdropBorderColor(TOK.gold_dim[1], TOK.gold_dim[2], TOK.gold_dim[3], 1)
     histPop:Hide()

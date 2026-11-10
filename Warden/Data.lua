@@ -88,91 +88,22 @@ local function mkSpec(serverName)
     return function(targetName, immediate) whisperSpec(serverName, targetName, immediate) end
 end
 
-ns.Data.SPEC_EXEC = {
-    WARRIOR = {
-        ["prot pve"]  = mkSpec("prot pve"),
-        ["arms pve"]  = mkSpec("arms pve"),
-        ["fury pve"]  = mkSpec("fury pve"),
-        ["prot pvp"]  = mkSpec("prot pvp"),
-        ["arms pvp"]  = mkSpec("arms pvp"),
-        ["fury pvp"]  = mkSpec("fury pvp"),
-    },
-    PALADIN = {
-        ["prot pve"]  = mkSpec("prot pve"),
-        ["holy pve"]  = mkSpec("holy pve"),
-        ["ret pve"]   = mkSpec("ret pve"),
-        ["prot pvp"]  = mkSpec("prot pvp"),
-        ["holy pvp"]  = mkSpec("holy pvp"),
-        ["ret pvp"]   = mkSpec("ret pvp"),
-    },
-    DEATHKNIGHT = {
-        ["blood pve"]     = mkSpec("blood pve"),
-        ["frost pve"]     = mkSpec("frost pve"),
-        ["unholy pve"]    = mkSpec("unholy pve"),
-        ["da blood pve"]  = mkSpec("double aura blood pve"),
-        ["blood pvp"]     = mkSpec("blood pvp"),
-        ["frost pvp"]     = mkSpec("frost pvp"),
-        ["unholy pvp"]    = mkSpec("unholy pvp"),
-    },
-    SHAMAN = {
-        ["resto pve"] = mkSpec("resto pve"),
-        ["ele pve"]   = mkSpec("ele pve"),
-        ["enh pve"]   = mkSpec("enh pve"),
-        ["resto pvp"] = mkSpec("resto pvp"),
-        ["ele pvp"]   = mkSpec("ele pvp"),
-        ["enh pvp"]   = mkSpec("enh pvp"),
-    },
-    HUNTER = {
-        ["bm pve"]   = mkSpec("bm pve"),
-        ["mm pve"]   = mkSpec("mm pve"),
-        ["surv pve"] = mkSpec("surv pve"),
-        ["bm pvp"]   = mkSpec("bm pvp"),
-        ["mm pvp"]   = mkSpec("mm pvp"),
-        ["surv pvp"] = mkSpec("surv pvp"),
-    },
-    DRUID = {
-        ["bear pve"]    = mkSpec("bear pve"),
-        ["resto pve"]   = mkSpec("resto pve"),
-        ["cat pve"]     = mkSpec("cat pve"),
-        ["balance pve"] = mkSpec("balance pve"),
-        ["resto pvp"]   = mkSpec("resto pvp"),
-        ["cat pvp"]     = mkSpec("cat pvp"),
-        ["balance pvp"] = mkSpec("balance pvp"),
-    },
-    ROGUE = {
-        ["subtlety pve"] = mkSpec("subtlety pve"),
-        ["combat pve"]   = mkSpec("combat pve"),
-        ["as pve"]       = mkSpec("as pve"),
-        ["subtlety pvp"] = mkSpec("subtlety pvp"),
-        ["combat pvp"]   = mkSpec("combat pvp"),
-        ["as pvp"]       = mkSpec("as pvp"),
-    },
-    PRIEST = {
-        ["holy pve"]    = mkSpec("holy pve"),
-        ["disc pve"]    = mkSpec("disc pve"),
-        ["shadow pve"]  = mkSpec("shadow pve"),
-        ["holy pvp"]    = mkSpec("holy pvp"),
-        ["disc pvp"]    = mkSpec("disc pvp"),
-        ["shadow pvp"]  = mkSpec("shadow pvp"),
-    },
-    MAGE = {
-        ["frost pve"]     = mkSpec("frost pve"),
-        ["fire pve"]      = mkSpec("fire pve"),
-        ["arcane pve"]    = mkSpec("arcane pve"),
-        ["frostfire pve"] = mkSpec("frostfire pve"),
-        ["frost pvp"]     = mkSpec("frost pvp"),
-        ["fire pvp"]      = mkSpec("fire pvp"),
-        ["arcane pvp"]    = mkSpec("arcane pvp"),
-    },
-    WARLOCK = {
-        ["affli pve"]  = mkSpec("affli pve"),
-        ["demo pve"]   = mkSpec("demo pve"),
-        ["destro pve"] = mkSpec("destro pve"),
-        ["affli pvp"]  = mkSpec("affli pvp"),
-        ["demo pvp"]   = mkSpec("demo pvp"),
-        ["destro pvp"] = mkSpec("destro pvp"),
-    },
-}
+-- Warden spec key -> server spec name, where they differ. Everything else
+-- is sent verbatim (talents spec AND init=<rarity> <name> <spec>).
+local SERVER_SPEC = { ["da blood pve"] = "double aura blood pve" }
+
+function ns.Data.ServerSpec(spec)
+    return spec and (SERVER_SPEC[spec] or spec) or nil
+end
+
+-- SPEC_EXEC[class][specKey](targetName, immediate): one entry per
+-- CLASS_SPECS key (the two tables used to be kept in sync by hand).
+ns.Data.SPEC_EXEC = {}
+for class, specs in pairs(ns.Data.CLASS_SPECS) do
+    local t = {}
+    for _, spec in ipairs(specs) do t[spec] = mkSpec(ns.Data.ServerSpec(spec)) end
+    ns.Data.SPEC_EXEC[class] = t
+end
 
 -- ----------------------------------------------------------
 -- mod-playerbots strategy codes (discovered from OptimalRaidComp's STRAT_MAP).

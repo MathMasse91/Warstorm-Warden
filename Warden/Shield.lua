@@ -322,11 +322,7 @@ local function ensureRow(idx, parent)
     row = CreateFrame("Button", "WardenShieldRow" .. idx, parent)
     row:EnableMouse(true)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    row:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    row:SetBackdrop(ns.UI.FLAT_BACKDROP)
     row:SetBackdropColor(0.10, 0.08, 0.05, 1)
     row:SetBackdropBorderColor(STONE_RIM[1], STONE_RIM[2], STONE_RIM[3], 1)
 
@@ -1175,11 +1171,7 @@ local function build()
 
     -- Cast-on chip (conditional, caston only)
     local chip = CreateFrame("Frame", nil, f)
-    chip:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    chip:SetBackdrop(ns.UI.FLAT_BACKDROP)
     chip:SetBackdropColor(0.10, 0.08, 0.04, 1)
     chip:SetBackdropBorderColor(GOLD_RIM[1], GOLD_RIM[2], GOLD_RIM[3], 1)
     chip:EnableMouse(true)
@@ -1221,11 +1213,7 @@ local function build()
     filterRow:Hide()
     state.filterRow = filterRow
 
-    filterRow:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    filterRow:SetBackdrop(ns.UI.FLAT_BACKDROP)
     filterRow:SetBackdropColor(0.04, 0.03, 0.02, 1)
     filterRow:SetBackdropBorderColor(STONE_RIM[1], STONE_RIM[2], STONE_RIM[3], 1)
 

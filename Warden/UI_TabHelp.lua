@@ -520,11 +520,7 @@ local function renderSteps(content, y, node)
         -- (pad.num), so it is reused whenever the pad is reused.
         local pad = acquire("steps.pad", function()
             local f = CreateFrame("Frame", nil, content)
-            f:SetBackdrop({
-                bgFile   = "Interface\\Buttons\\WHITE8x8",
-                edgeFile = "Interface\\Buttons\\WHITE8x8",
-                edgeSize = 1,
-            })
+            f:SetBackdrop(ns.UI.FLAT_BACKDROP)
             f.num = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             f.num:SetPoint("CENTER", f, "CENTER", 0, 0)
             return f
@@ -592,11 +588,7 @@ local function renderCmd(content, y, node)
     -- (frame.accent / frame.textfs), so they are reused whenever it is.
     local frame = acquire("cmd.frame", function()
         local f = CreateFrame("Frame", nil, content)
-        f:SetBackdrop({
-            bgFile   = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Buttons\\WHITE8x8",
-            edgeSize = 1,
-        })
+        f:SetBackdrop(ns.UI.FLAT_BACKDROP)
         f.accent = f:CreateTexture(nil, "ARTWORK")
         f.accent:SetTexture("Interface\\Buttons\\WHITE8x8")
         f.accent:SetWidth(2)

@@ -119,6 +119,14 @@ end
 -- ----------------------------------------------------------
 -- UI style helpers (Direction I "refined stone frame" vocabulary)
 -- ----------------------------------------------------------
+-- Flat 1px-rim backdrop shared by every panel / tile / button (SetBackdrop
+-- copies the table, so one instance is safe to reuse).
+ns.UI.FLAT_BACKDROP = {
+    bgFile   = "Interface\\Buttons\\WHITE8x8",
+    edgeFile = "Interface\\Buttons\\WHITE8x8",
+    edgeSize = 1,
+}
+
 ns.UI.Button = ns.UI.Button or {}
 ns.UI.Panel  = ns.UI.Panel  or {}
 
@@ -174,11 +182,7 @@ local function _makeBtn(parent, text, w, h, opts)
     b:EnableMouse(true)
     b:RegisterForClicks("LeftButtonUp")
 
-    b:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    b:SetBackdrop(ns.UI.FLAT_BACKDROP)
     local bg, rim, lbl = opts.bg, opts.rim, opts.label
     b:SetBackdropColor(bg[1], bg[2], bg[3], 1)
     b:SetBackdropBorderColor(rim[1], rim[2], rim[3], 1)
@@ -457,11 +461,7 @@ ns.UI.Chip = ns.UI.Chip or {}
 function ns.UI.Chip.provide(parent, label, on)
     local c = CreateFrame("Frame", nil, parent)
     c:SetSize(36, 14)
-    c:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    c:SetBackdrop(ns.UI.FLAT_BACKDROP)
     if on then
         c:SetBackdropColor(0.22, 0.17, 0.08, 1)
         c:SetBackdropBorderColor(0.72, 0.58, 0.21, 1)
@@ -486,11 +486,7 @@ end
 function ns.UI.Panel.Create(parent, w, h, headerText)
     local frame = CreateFrame("Frame", nil, parent)
     frame:SetSize(w, h)
-    frame:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    frame:SetBackdrop(ns.UI.FLAT_BACKDROP)
     frame:SetBackdropColor(0.10, 0.08, 0.05, 0.85)
     frame:SetBackdropBorderColor(0.23, 0.18, 0.13, 1)
 
@@ -627,11 +623,7 @@ ns.UI.Segmented = ns.UI.Segmented or {}
 function ns.UI.Segmented.Create(parent, items, onChange)
     local f = CreateFrame("Frame", nil, parent)
     f:SetHeight(22)
-    f:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Buttons\\WHITE8x8",
-        edgeSize = 1,
-    })
+    f:SetBackdrop(ns.UI.FLAT_BACKDROP)
     local T = ns.Tokens
     f:SetBackdropColor(T.stone_mid[1], T.stone_mid[2], T.stone_mid[3], 1)
     f:SetBackdropBorderColor(T.stone_rim[1], T.stone_rim[2], T.stone_rim[3], 1)
@@ -662,11 +654,7 @@ function ns.UI.Segmented.Create(parent, items, onChange)
 
     for i, it in ipairs(items) do
         local b = CreateFrame("Button", nil, f)
-        b:SetBackdrop({
-            bgFile   = "Interface\\Buttons\\WHITE8x8",
-            edgeFile = "Interface\\Buttons\\WHITE8x8",
-            edgeSize = 1,
-        })
+        b:SetBackdrop(ns.UI.FLAT_BACKDROP)
         b:SetBackdropColor(0, 0, 0, 0)
         b:SetBackdropBorderColor(0, 0, 0, 0)
         b:EnableMouse(true)
@@ -902,8 +890,7 @@ StaticPopupDialogs["WARDEN_CONFIRM_CLEANUP"] = {
     button1      = YES, button2 = NO, timeout = 0,
     whileDead    = true, hideOnEscape = true,
     OnAccept     = function()
-        local db = ns.Persistence.DB
-        ns.Engine.SendNow(".warstormbot bot remove *", (db and db.commandChannel) or "SAY")
+        ns.Engine.SendNow(".warstormbot bot remove *")
         ns.MsgWarn("Cleanup: removed all bots.")
     end,
 }
@@ -914,10 +901,10 @@ StaticPopupDialogs["WARDEN_CONFIRM_HARD_RESPEC"] = {
     whileDead    = true, hideOnEscape = true,
     OnAccept     = function()
         -- Uses the shared saved rarity (was hardcoded epic).
-        local rarity = ns.Persistence.GetInitRarity()
-        local db     = ns.Persistence.DB
-        ns.Engine.SendNow(".warstormbot bot init=" .. rarity, (db and db.commandChannel) or "SAY")
-        ns.MsgWarn("Hard ReSpec: sent `.warstormbot bot init=" .. rarity .. "`.")
+        -- Bare init on purpose: re-rolls gear AND talents for every bot.
+        local cmd = ns.Engine.InitCommand(ns.Persistence.GetInitRarity())
+        ns.Engine.SendNow(cmd)
+        ns.MsgWarn("Hard ReSpec: sent `" .. cmd .. "`.")
     end,
 }
 
