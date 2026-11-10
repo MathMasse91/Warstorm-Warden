@@ -77,13 +77,19 @@ ns.Data.DEFAULT_SPEC_PVE = {
 local function whisperSpec(specServerName, targetName, immediate)
     local target = targetName or UnitName("target")
     if not target then return end
-    -- Spec + gear in one server init at the saved rarity (see Engine.SpecCommand).
     return ns.Engine.ApplySpec(target, specServerName, immediate)
 end
 
 local function mkSpec(serverName)
     return function(targetName, immediate) return whisperSpec(serverName, targetName, immediate) end
 end
+
+-- Gear-rarity feature (rarity dropdowns, RB, Re-gear Bots, Create at a
+-- rarity) is HIDDEN: the server's `init=<rarity> <name>` takes no spec and
+-- re-rolls a random one, so spec + lower-rarity gear can't be combined yet
+-- (ticket open with WarStorm). While false, every rarity reads as "epic" and
+-- spec changes are `talents spec <spec>` + `autogear`.
+ns.Data.GEAR_RARITY = false
 
 -- Warden spec key -> server spec name, where they differ. Everything else
 -- is sent verbatim (talents spec AND init=<rarity> <name> <spec>).

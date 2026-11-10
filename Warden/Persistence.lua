@@ -286,6 +286,7 @@ end
 -- Shared bot-init rarity: every rarity dropdown reads and writes this one
 -- saved key, so the last pick sticks across dropdowns and sessions.
 function ns.Persistence.GetInitRarity()
+    if not ns.Data.GEAR_RARITY then return "epic" end  -- feature hidden
     local db = ns.Persistence.DB
     local r  = db and db.initRarity
     if ns.Data.IsRarity(r) then return r end

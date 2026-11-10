@@ -186,7 +186,7 @@ local function layoutSpecRow(entries, class, modeLabel, topY, label)
 
         t.cap:SetText(ns.Data.SpecCaption(e.base))
         ns.UI.Tooltip.Attach(t, ns.Data.SpecCaption(e.base) .. " (" .. modeLabel .. ")",
-            function() return "Sends `.warstormbot bot init=" .. ns.Persistence.GetInitRarity() .. " " .. (resolveTarget() or "<target>") .. " <spec>`: spec + gear at the selected rarity." end,
+            function() return "Whispers `talents spec` + `autogear` to " .. (resolveTarget() or "the target") .. "." end,
             "ANCHOR_TOP")
 
         local spec = e.spec
@@ -212,7 +212,7 @@ local function layoutSpecRow(entries, class, modeLabel, topY, label)
                 return
             end
             ns.Engine.TrackSpec(guid, name, spec, class)
-            ns.MsgInfo(string.format("Init: `%s`.", cmd))
+            ns.MsgInfo(string.format("Sent `%s`.", cmd))
         end)
         t:Show()
     end
@@ -294,6 +294,7 @@ local function buildBody()
     -- through Engine.SendNow (un-throttled: fires INSTANTLY, keeps the
     -- no-direct-SendChatMessage invariant).
     -- The label is dropped (the rarity + RB tooltip carry the meaning).
+    if not ns.Data.GEAR_RARITY then return end  -- feature hidden
     frame.rarityDrop = ns.UI.RarityDropdown("WardenMantleRarityDrop", frame, 96)
 
     -- Compact "RB" button (was "ResetBot"): label stays tiny to shrink the
@@ -377,13 +378,16 @@ local function Refresh()
     -- UIDropDownMenuTemplate carries a ~16px left inset, so nudge x to line its
     -- text up with PAD; RB anchors to the dropdown's right edge (negative x to
     -- absorb the template's right chrome) so the pair reads as one control.
-    frame.rarityDrop:ClearAllPoints()
-    frame.rarityDrop:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD - 14, -y + 2)
-    frame.rarityDrop:Show()
-    frame.resetBtn:ClearAllPoints()
-    frame.resetBtn:SetPoint("LEFT", frame.rarityDrop, "RIGHT", -6, 3)
-    frame.resetBtn:Show()
-    y = y + 24 + PAD
+    if frame.rarityDrop then
+        frame.rarityDrop:ClearAllPoints()
+        frame.rarityDrop:SetPoint("TOPLEFT", frame, "TOPLEFT", PAD - 14, -y + 2)
+        frame.rarityDrop:Show()
+        frame.resetBtn:ClearAllPoints()
+        frame.resetBtn:SetPoint("LEFT", frame.rarityDrop, "RIGHT", -6, 3)
+        frame.resetBtn:Show()
+        y = y + 24
+    end
+    y = y + PAD
 
     hideUnusedTiles()
     frame:SetSize(WIDTH, y)

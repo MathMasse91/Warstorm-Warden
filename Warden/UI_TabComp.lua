@@ -2215,10 +2215,9 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
         if #plan == 0 then ns.MsgErr("Grid is empty - nothing to create."); return end
         -- Destructive (removes ALL bots; order from Feryll/Huntriss [DGEN],
         -- see Engine.CreateRaid) -> always behind a confirm.
-        local rarity = ns.Persistence.GetInitRarity()
-        ns.UI.Confirm(string.format("Create raid:\nremoves ALL current bots, re-summons this comp, "
-            .. "gears + specs them (init=%s), then strategies + buffs. Proceed?", rarity),
-            function() ns.Engine.CreateRaid(plan, { initRarity = rarity }) end)
+        ns.UI.Confirm("Create raid:\nremoves ALL current bots, re-summons this comp, "
+            .. "specs + autogears them, then strategies + buffs. Proceed?",
+            function() ns.Engine.CreateRaid(plan) end)
     end)
 
     -- Build: the primary build kickoff, moved down from the sidebar so it sits

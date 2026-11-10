@@ -141,7 +141,7 @@ local function refreshTargetCard()
         s.metaLbl:SetText(string.format("- %s - %s",
             ns.ColorClass(classTok or "", className),
             faction ~= "" and faction or "Unknown"))
-        s.hintLbl:SetText("|cffffd100init=<rarity> <name> <spec>|r -> spec + gear, tracked by GUID")
+        s.hintLbl:SetText("whisper |cffffd100talents spec <name>|r + autogear -> tracked by GUID")
 
         pushHistory(name)
     else
@@ -641,6 +641,8 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     -- Rarity list + saved pick are shared (ns.Data / ns.Persistence) so the
     -- last choice sticks across the Spec tab, WardenMantle and Create.
 
+    local tip = ns.UI.Tooltip.Attach
+    if ns.Data.GEAR_RARITY then  -- feature hidden (see ns.Data.GEAR_RARITY)
     local biLbl = cardPanel.content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     biLbl:SetPoint("TOPRIGHT", cardPanel.content, "TOPRIGHT", -8, -2)
     biLbl:SetText("BOT INIT")
@@ -654,16 +656,16 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     levelBtn:SetScript("OnClick", function()
         ns.Engine.Regear()  -- every bot, keeping each tracked spec
     end)
+    tip(levelBtn, "Re-gear bots",
+        "Sends `.warstormbot bot init=<rarity> <name>` to every bot (rarity from the dropdown, remembered).",
+        "ANCHOR_TOP")
+    end
 
-    -- U9 tooltips for the action row + bot-init control.
-    local tip = ns.UI.Tooltip.Attach
+    -- U9 tooltips for the action row.
     tip(prevBtn, "Previous target", "Re-targets your last target (/targetlasttarget). Works in combat.", "ANCHOR_TOP")
     tip(histBtn, "Target history", "Your last 6 player targets; click one to re-target it.", "ANCHOR_TOP")
     tip(autogearBtn, "Autogear", "Broadcasts `autogear` to your group: every bot equips its best gear.", "ANCHOR_TOP")
     tip(buffsBtn, "World Buffs", "Broadcasts `nc +worldbuff` to your group.", "ANCHOR_TOP")
-    tip(levelBtn, "Re-gear bots",
-        "Sends `.warstormbot bot init=<rarity> <name> <spec>` to every bot (rarity from the dropdown, remembered): re-gears at that rarity and keeps each bot's tracked spec. Untracked bots get a random spec. Don't Autogear after: it re-gears at epic.",
-        "ANCHOR_TOP")
 
     -- ============================================================
     -- Specs grid panel

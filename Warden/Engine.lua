@@ -645,12 +645,14 @@ local function whisperTick(self, elapsed)
 
     local item = table.remove(s.whisperQueue, 1)
     if item and item.name and item.spec then
-        SendChatMessage(ns.Engine.SpecCommand(item.name, item.spec), ns.Engine.CommandChannel())
+        SendChatMessage("talents spec " .. ns.Data.ServerSpec(item.spec), "WHISPER", nil, item.name)
         s.counters.specd = s.counters.specd + 1
         if ns.LogF then
-            ns.LogF("spec init sent: '%s' for %s (left: %d)",
+            ns.LogF("whisper sent: 'talents spec %s' to %s (whispers left: %d)",
                 item.spec, item.name, #s.whisperQueue)
         end
+        -- Gear follows the new spec (epic, the server cap).
+        table.insert(s.whisperQueue, { name = item.name, strat = "autogear" })
 
         -- Chase with mod-playerbots strategy commands (nc +bstats, nc totems melee, ...)
         -- Append to tail (not front): they chase by one throttle-tick per strat,
@@ -891,152 +893,25 @@ function ns.Engine.InitCommand(rarity, name, spec)
     return cmd
 end
 
--- A spec change is an init: `talents spec` alone keeps (or resets) the gear
--- for the old spec, so every spec swap re-gears at the saved rarity with the
--- new spec in one server command.
-function ns.Engine.SpecCommand(name, spec)
-    return ns.Engine.InitCommand(ns.Persistence.GetInitRarity(), name, ns.Data.ServerSpec(spec))
-end
-
--- Apply a spec to one bot (skips human-flagged names). immediate = send now
--- (single user click); otherwise throttled through the send queue (routed as
--- a table so a mid-build send never arms the bot-join gate).
+-- Apply a spec to one bot (skips human-flagged names): `talents spec <spec>`
+-- then `autogear` so the gear follows the new spec (epic, the server cap).
+-- immediate = sent now (single user click); otherwise throttled through the
+-- send queue. Returns a description of what was sent.
+-- (Spec + a lower gear rarity needs a server init that takes a spec - see
+-- ns.Data.GEAR_RARITY.)
 function ns.Engine.ApplySpec(name, spec, immediate)
     if type(name) ~= "string" or name == "" or type(spec) ~= "string" or spec == "" then return end
     if ns.Persistence and ns.Persistence.IsPlayerName
        and ns.Persistence.IsPlayerName(name) then return end
-    if immediate then return ns.Engine.InitOne(name, spec) end
-    local cmd = ns.Engine.SpecCommand(name, spec)
-    ns.Engine.Queue(cmd, ns.Engine.CommandChannel())
-    return cmd
-end
-
--- ----------------------------------------------------------
--- InitOne: one user-clicked init (Mantle tile, RB, Smart ReSpec).
--- Two server-side failure modes seen in game: a second init sent while the
--- first is still applying is lost, and an init sometimes leaves the old
--- talents. So: inits for the same bot are spaced INIT_GAP apart (rapid
--- clicks coalesce, latest spec wins), and VERIFY_DELAY after each send the
--- bot is inspected; if its dominant talent tree isn't the asked spec's, the
--- init is re-sent once.
--- ----------------------------------------------------------
-local INIT_GAP, VERIFY_DELAY, MAX_TRIES = 4.0, 3.0, 2
-local lastInit, pendingInit, initSeq = {}, {}, 0
-local verifying  -- { name, spec, tree, tries } awaiting INSPECT_TALENT_READY
-
--- Mirrors lib/engine_helpers SpecTree / DominantTree / InitDelay.
-local SPEC_TREE = {
-    WARRIOR     = { arms = 1, fury = 2, prot = 3 },
-    PALADIN     = { holy = 1, prot = 2, ret = 3 },
-    HUNTER      = { bm = 1, mm = 2, surv = 3 },
-    ROGUE       = { as = 1, combat = 2, subtlety = 3 },
-    PRIEST      = { disc = 1, holy = 2, shadow = 3 },
-    DEATHKNIGHT = { blood = 1, frost = 2, unholy = 3 },
-    SHAMAN      = { ele = 1, enh = 2, resto = 3 },
-    MAGE        = { arcane = 1, fire = 2, frost = 3 },
-    WARLOCK     = { affli = 1, demo = 2, destro = 3 },
-    DRUID       = { balance = 1, bear = 2, cat = 2, resto = 3 },
-}
-local function specTree(classToken, spec)
-    if type(spec) ~= "string" then return nil end
-    local t = SPEC_TREE[classToken]
-    if not t then return nil end
-    local base = spec:match("^da (%a+)") or spec:match("^double aura (%a+)") or spec:match("^(%a+)")
-    return base and t[base] or nil
-end
-local function dominantTree(p1, p2, p3)
-    local pts = { p1 or 0, p2 or 0, p3 or 0 }
-    local best, bi = 0, nil
-    for i = 1, 3 do if pts[i] > best then best, bi = pts[i], i end end
-    return bi
-end
-local function initDelay(last, now, gap)
-    if not last then return 0 end
-    local d = last + gap - now
-    return d > 0 and d or 0
-end
-
-local function unitByName(name)
-    for _, u in ipairs(ns.GroupUnits()) do
-        if UnitName(u) == name then return u end
-    end
-    if UnitName("target") == name then return "target" end
-end
-
-local sendInit  -- forward
-
-local function verifyInit(name, spec, tries)
-    local unit = unitByName(name)
-    local _, classToken = unit and UnitClass(unit)
-    local tree = specTree(classToken, spec)
-    if not unit or not tree then return end  -- not verifiable
-    if not (CanInspect and CanInspect(unit)) then
-        ns.MsgWarn(name .. ": out of inspect range - can't check the spec took.")
-        return
-    end
-    verifying = { name = name, spec = spec, tree = tree, tries = tries }
-    NotifyInspect(unit)
-    -- No answer (range/lag): drop the check quietly.
-    ns.Engine.After(3.0, function()
-        if verifying and verifying.name == name then verifying = nil end
-    end)
-end
-
-local inspectWatch = CreateFrame("Frame")
-inspectWatch:RegisterEvent("INSPECT_TALENT_READY")
-inspectWatch:SetScript("OnEvent", function()
-    local v = verifying
-    if not v then return end
-    verifying = nil
-    local pts = {}
-    for i = 1, 3 do
-        local _, _, p = GetTalentTabInfo(i, true)
-        pts[i] = tonumber(p) or 0
-    end
-    if ns.LogF then
-        ns.LogF("InitOne verify %s: want tree %d, got %d/%d/%d", v.name, v.tree, pts[1], pts[2], pts[3])
-    end
-    local got = dominantTree(pts[1], pts[2], pts[3])
-    if got == v.tree then
-        ns.MsgInfo(string.format("%s: %s applied (%d/%d/%d).", v.name, v.spec, pts[1], pts[2], pts[3]))
-    elseif v.tries < MAX_TRIES then
-        ns.MsgWarn(string.format("%s: server didn't apply %s (%d/%d/%d) - re-sending.",
-            v.name, v.spec, pts[1], pts[2], pts[3]))
-        sendInit(v.name, v.spec, v.tries + 1)
+    local talents = "talents spec " .. ns.Data.ServerSpec(spec)
+    if immediate then
+        ns.Engine.WhisperNow(name, talents)
+        ns.Engine.WhisperNow(name, "autogear")
     else
-        ns.MsgErr(string.format("%s: %s still not applied after %d inits (%d/%d/%d).",
-            v.name, v.spec, v.tries, pts[1], pts[2], pts[3]))
+        ns.Engine.Queue(talents, "WHISPER", name)
+        ns.Engine.Queue("autogear", "WHISPER", name)
     end
-end)
-
--- Sends now, or after the per-bot gap; a newer request replaces a pending one.
-sendInit = function(name, spec, tries)
-    initSeq = initSeq + 1
-    local id = initSeq
-    pendingInit[name] = { id = id, spec = spec, tries = tries }
-    local wait = initDelay(lastInit[name], GetTime(), INIT_GAP)
-    local function fire()
-        local p = pendingInit[name]
-        if not p or p.id ~= id then return end  -- superseded
-        pendingInit[name] = nil
-        lastInit[name] = GetTime()
-        local cmd = ns.Engine.SpecCommand(name, p.spec)
-        ns.Engine.SendNow(cmd)
-        ns.Engine.After(VERIFY_DELAY, function()
-            if not pendingInit[name] then verifyInit(name, p.spec, p.tries) end
-        end)
-    end
-    if wait > 0 then
-        ns.MsgInfo(string.format("%s: previous init still applying - sending %s in %.0fs.", name, spec, wait))
-        ns.Engine.After(wait, fire)
-    else
-        fire()
-    end
-end
-
-function ns.Engine.InitOne(name, spec)
-    sendInit(name, spec, 1)
-    return ns.Engine.SpecCommand(name, spec)
+    return string.format("/w %s %s + autogear", name, talents)
 end
 
 -- Spec Warden knows for a unit: tracked assignment (by GUID) first.
@@ -1087,23 +962,21 @@ function ns.Engine.Regear(name, guid)
         ns.MsgWarn(name .. ": spec unknown - click a spec tile instead (it re-gears at the selected rarity).")
         return 0
     end
-    local cmd = ns.Engine.InitOne(name, a.spec)
-    ns.MsgInfo(string.format("Init: `%s`.", cmd))
+    local cmd = ns.Engine.InitCommand(rarity, name, ns.Data.ServerSpec(a.spec))
+    ns.Engine.SendNow(cmd)
+    ns.MsgInfo(string.format("Sent `%s`.", cmd))
     return 1
 end
 
 -- ----------------------------------------------------------
 -- Public API: CreateRaid - the one-click "Create" sequence.
--- Order (init-first, from Feryll/Huntriss [DGEN]): remove all bots -> paced
--- StartBuild in deferSpecs mode (bots are only recorded as they join) ->
--- on completion: per-bot `init=<rarity> <name> <spec>` (gear + spec in one
--- server command) -> once the init queue has drained and the server had
--- INIT_SETTLE seconds, whisper every bot's strategies -> once those drain:
--- Bloodlust/Heroism excluded, group buffs, soulstone, world buffs.
--- No `talents spec` whisper (init applied it) and no `autogear` (it would
--- re-gear at the server's epic cap and undo a lower rarity).
--- If some bots never joined, the build still completes on BUILD_TIMEOUT and
--- the chain runs for the bots that did. opts = { initRarity = "epic" | nil }.
+-- Order (from Feryll/Huntriss [DGEN]): remove all bots -> paced StartBuild
+-- in deferSpecs mode (bots are only recorded as they join) -> on completion:
+-- per-bot `talents spec` + `autogear` + strategy whispers -> once those drain
+-- and INIT_SETTLE seconds pass: Bloodlust/Heroism excluded, group buffs,
+-- soulstone, world buffs. No init: the server's init re-rolls a random spec
+-- (see ns.Data.GEAR_RARITY). If some bots never joined, the build still
+-- completes on BUILD_TIMEOUT and the chain runs for the bots that did.
 -- ----------------------------------------------------------
 local INIT_SETTLE = 3.0
 
@@ -1112,18 +985,6 @@ local INIT_SETTLE = 3.0
 local PRAYER_OF_FORTITUDE_ID = 48162
 local GIFT_OF_THE_WILD_ID    = 48470
 local PRAYER_OF_SPIRIT_ID    = 48074
-
--- Run fn once the send queue is empty, plus `extra` seconds.
-local function afterSendDrained(extra, fn)
-    local function poll()
-        if #ns.Engine.state.sendQueue > 0 then
-            ns.Engine.After(0.5, poll)
-        else
-            ns.Engine.After(extra or 0, fn)
-        end
-    end
-    poll()
-end
 
 local function finishCreate(hasClass)
     ns.Engine.After(1.0, function()
@@ -1169,28 +1030,16 @@ function ns.Engine.CreateRaid(plan, opts)
             if item.classToken then hasClass[item.classToken] = true end
         end
 
-        local specByName = {}
-        for _, item in ipairs(items) do specByName[item.name] = item.spec end
-        ns.Engine.InitBots(opts.initRarity or "epic", specByName)
-
-        afterSendDrained(INIT_SETTLE, function()
-            -- Spec came with init; only the strategy chasers remain.
-            local n = 0
-            for _, item in ipairs(items) do
-                if item.classToken and ns.Data and ns.Data.BuildStratCommands then
-                    for _, cmd in ipairs(ns.Data.BuildStratCommands(
-                            item.classToken, item.opt1, item.opt2, item.spec)) do
-                        ns.Engine.PushWhisper({ name = item.name, strat = cmd })
-                        n = n + 1
-                    end
-                end
-            end
-            DEFAULT_CHAT_FRAME:AddMessage(string.format(
-                "|cff00ff00[Warden]|r Create: %d bot(s) inited with spec, %d strategy whisper(s).",
-                #items, n))
-            if n == 0 then finishCreate(hasClass); return end
-            s.onWhispersDrained = function() finishCreate(hasClass) end
-        end)
+        -- No init (it would re-roll a random spec; see ns.Data.GEAR_RARITY):
+        -- each spec item whispers `talents spec` + `autogear` + its strategy
+        -- chasers through the whisper queue; buffs once it drains.
+        for _, item in ipairs(items) do ns.Engine.PushWhisper(item) end
+        DEFAULT_CHAT_FRAME:AddMessage(string.format(
+            "|cff00ff00[Warden]|r Create: speccing %d bot(s).", #items))
+        if #items == 0 then finishCreate(hasClass); return end
+        s.onWhispersDrained = function()
+            ns.Engine.After(INIT_SETTLE, function() finishCreate(hasClass) end)
+        end
     end
 
     -- Give the remove-all a beat to process, then kick off the paced build.
