@@ -71,6 +71,9 @@ That's how **Warden v1.0.0** happened. 👍
 - **Coverage panel** — a raid-grid table of buff tiles that light green when provided and stay dim-red when missing, so gaps read at a glance
 - Consolidated **action bar** along the bottom: FILE row (save / load / import / export / delete / clear / cleanup / rename) up top, and the **Build · Create · Stop Build** group with the live Queue/Pending status below
 - `[P]` flag = real player (never touched)
+- **Create** (one click): removes all bots, re-summons the comp, gear-inits each bot at your saved rarity, *then* applies specs + strategies (init re-rolls talents), then autogear, Bloodlust/Heroism off, Fortitude / Gift of the Wild / Spirit and a warlock soulstone on you — order and buffs by **Feryll/Huntriss [DGEN]**
+- **To Chat**: post the comp as readable text to Raid / Party / Guild / Officer / Say / Yell / BG — by **Feryll/Huntriss [DGEN]**
+- Paladin auras are held in combat too (`nc` + `co`), warrior shouts are locked to the one you picked (`ss` by spell ID)
 
 **Roster**
 - Live raid grouped: Tank / Healer / DPS
@@ -264,6 +267,7 @@ Bindable under **ESC → Key Bindings → "Warden"**: toggle window, tab shortcu
 Forked from **WSSM** (Patchs & Valleriaa), and merges ideas/code from:
 - **WarstormBotManager** — Moroes
 - **WBM Lite** & **OptimalRaidComposer** — Runshouse
+- **Create-raid init order, group buffs, soulstone, paladin combat auras & Chat Comp** — Feryll/Huntriss [DGEN]
 
 Huge thanks to all of them — Warden stands on their work.
 

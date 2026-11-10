@@ -35,6 +35,77 @@ local function Trim(s)
     return s
 end
 
+-- ----------------------------------------------------------
+-- Chat Comp: a human-readable, chat-safe summary of the grid (as opposed to
+-- the WRDN2 export string, which is for addon import). Idea and original
+-- implementation by Feryll/Huntriss [DGEN].
+-- ----------------------------------------------------------
+local CHAT_SPEC_SHORT = {
+    ["as"] = "Assn", ["affli"] = "Affli", ["balance"] = "Boom", ["unholy"] = "UH",
+    ["subtlety"] = "Sub", ["frostfire"] = "FFB", ["da blood"] = "DA Blood",
+}
+
+-- "holy pve" -> "Holy", "ret pvp" -> "Ret PvP", "balance pve" -> "Boom".
+local function chatSpecLabel(spec)
+    if type(spec) ~= "string" or spec == "" then return "?" end
+    local base, mode = string.match(spec, "^(.-)%s+(pv[ep])$")
+    base = base or spec
+    local label = CHAT_SPEC_SHORT[base]
+        or (string.upper(string.sub(base, 1, 1)) .. string.sub(base, 2))
+    if mode == "pvp" then label = label .. " PvP" end
+    return label
+end
+
+-- slots: sparse { [i] = { classToken, spec, isPlayer } }. The [P] slot is the
+-- person posting, not a recruit, so it's left out. Returns (lines, filled);
+-- lines is nil when nothing is filled. Lines split only between classes and
+-- each stays within the 255-char chat limit.
+local function buildChatCompLines(slots, size, compName, classOrder, classLabel)
+    local byClass, filled = {}, 0
+    for i = 1, size or 25 do
+        local slot = slots[i]
+        if slot and slot.classToken and not slot.isPlayer then
+            filled = filled + 1
+            local c = slot.classToken
+            local label = chatSpecLabel(slot.spec)
+            byClass[c] = byClass[c] or {}
+            byClass[c][label] = (byClass[c][label] or 0) + 1
+        end
+    end
+    if filled == 0 then return nil, 0 end
+
+    local segments = {}
+    for _, c in ipairs(classOrder) do
+        local specs = byClass[c]
+        if specs then
+            local names, parts = {}, {}
+            for label in pairs(specs) do table.insert(names, label) end
+            table.sort(names)
+            for _, label in ipairs(names) do
+                table.insert(parts, specs[label] .. " " .. label)
+            end
+            table.insert(segments, (classLabel[c] or c) .. ": " .. table.concat(parts, ", "))
+        end
+    end
+
+    local prefix = "Warden Comp"
+    if compName and compName ~= "" then prefix = prefix .. " [" .. compName .. "]" end
+    prefix = prefix .. " (" .. filled .. "/" .. (size or 25) .. "): "
+
+    local lines, current = {}, prefix
+    for _, seg in ipairs(segments) do
+        local candidate = (current == prefix) and (current .. seg) or (current .. " | " .. seg)
+        if #candidate > 255 and current ~= prefix then
+            table.insert(lines, current)
+            current = seg
+        else
+            current = candidate
+        end
+    end
+    table.insert(lines, current)
+    return lines, filled
+end
+
 -- splitSet + CLASS_ICON live in Data.lua now (ns.Data.SplitSet / ns.Data.CLASS_ICON).
 local splitSet = ns.Data.SplitSet
 local CLASS_ICON = ns.Data.CLASS_ICON
@@ -1530,16 +1601,17 @@ StaticPopupDialogs["WARDEN_CONFIRM_BUILD"] = {
 }
 
 -- Create: one-click ORC-style sequence - remove ALL current bots, paced
--- re-summon of this comp (auto-converts to raid + auto-specs + AI strats), then
--- per-bot init=epic, autogear, and world buffs. Destructive, so always behind a
--- confirm.
+-- re-summon of this comp, per-bot gear init at the saved rarity, THEN specs +
+-- AI strats (init re-rolls talents), then autogear, BL off, group buffs and
+-- world buffs (init-first order from Feryll/Huntriss [DGEN]). Destructive, so
+-- always behind a confirm.
 StaticPopupDialogs["WARDEN_CONFIRM_CREATE"] = {
-    text         = "Create raid:\nremoves ALL current bots, re-summons this comp, gears them (init=epic + autogear) and applies world buffs. Proceed?",
+    text         = "Create raid:\nremoves ALL current bots, re-summons this comp, gears them (init=%s), specs them, then autogear + buffs. Proceed?",
     button1      = YES, button2 = NO, timeout = 0,
     whileDead    = true, hideOnEscape = true,
     OnAccept     = function(_, data)
         if ns.Engine and ns.Engine.CreateRaid then
-            ns.Engine.CreateRaid(data, { initRarity = "epic" })
+            ns.Engine.CreateRaid(data, { initRarity = ns.Persistence.GetInitRarity() })
         end
     end,
 }
@@ -1774,6 +1846,62 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     filledCap:SetPoint("LEFT", numLbl, "RIGHT", 6, 0)
     filledCap:SetText("filled")
     filledCap:SetTextColor(0.61, 0.55, 0.40)
+
+    -- "To Chat" (Chat Comp, from Feryll/Huntriss [DGEN]): posts the grid as
+    -- readable text to a chat channel picked from a menu. The last channel is
+    -- saved and listed first-checked. Sent through Engine.SendNow.
+    local CHAT_CHANNELS = {
+        { text = "Raid",    value = "RAID" },
+        { text = "Party",   value = "PARTY" },
+        { text = "Guild",   value = "GUILD" },
+        { text = "Officer", value = "OFFICER" },
+        { text = "Say",     value = "SAY" },
+        { text = "Yell",    value = "YELL" },
+        { text = "Battleground", value = "BATTLEGROUND" },
+    }
+    local function publishChatComp(channel)
+        local name = state.nameBox and Trim(state.nameBox:GetText()) or ""
+        local lines = buildChatCompLines(state.slots, state.size, name,
+            ns.Data.CLASS_ORDER, ns.Data.CLASS_LABEL)
+        if not lines then ns.MsgWarn("Grid is empty - nothing to post."); return end
+        if channel == "RAID" and GetNumRaidMembers() == 0 then
+            ns.MsgWarn("You are not in a raid - pick another channel."); return
+        end
+        if channel == "PARTY" and GetNumPartyMembers() == 0 and GetNumRaidMembers() == 0 then
+            ns.MsgWarn("You are not in a group - pick another channel."); return
+        end
+        if channel == "GUILD" or channel == "OFFICER" then
+            if not IsInGuild() then ns.MsgWarn("You are not in a guild."); return end
+        end
+        local db = ns.Persistence.DB
+        if db then db.chatCompChannel = channel end
+        for _, msg in ipairs(lines) do ns.Engine.SendNow(msg, channel) end
+        ns.MsgInfo(string.format("Posted comp to %s (%d line%s).",
+            channel, #lines, #lines == 1 and "" or "s"))
+    end
+
+    local chatDrop = CreateFrame("Frame", "WardenCompChatMenu", sumHost, "UIDropDownMenuTemplate")
+    local chatBtn = ns.UI.Button.stone(sumHost, "To Chat", 64, 20)
+    chatBtn:SetPoint("RIGHT", sumHost, "RIGHT", -2, 0)
+    chatBtn:SetScript("OnClick", function(self)
+        UIDropDownMenu_Initialize(chatDrop, function()
+            local last = ns.Persistence.DB and ns.Persistence.DB.chatCompChannel
+            local h = UIDropDownMenu_CreateInfo()
+            h.isTitle, h.notCheckable, h.text = true, true, "Post comp to..."
+            UIDropDownMenu_AddButton(h)
+            for _, ch in ipairs(CHAT_CHANNELS) do
+                local e = UIDropDownMenu_CreateInfo()
+                e.text    = ch.text
+                e.checked = (last == ch.value)
+                e.func    = function() publishChatComp(ch.value) end
+                UIDropDownMenu_AddButton(e)
+            end
+        end, "MENU")
+        ToggleDropDownMenu(1, nil, chatDrop, self, 0, 0)
+    end)
+    ns.UI.Tooltip.Attach(chatBtn, "Post comp to chat",
+        "Posts the grid as readable text (e.g. \"Priest: 2 Disc | ...\") to the channel you pick. Long comps split between classes to fit the chat limit. Your [P] slot is left out.",
+        "ANCHOR_TOP")
 
     -- buildBtn itself is created in the bottom action row (see below); its
     -- click handler reuses runBuild + WARDEN_CONFIRM_BUILD defined at file scope.
@@ -2157,8 +2285,8 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     end)
 
     -- Create: one-click ORC-style sequence - remove ALL current bots, paced
-    -- re-summon of this comp (auto-converts to raid + auto-specs + AI strats),
-    -- then per-bot init=epic, autogear, and world buffs. Destructive, so it's
+    -- re-summon of this comp, gear init at the saved rarity, then specs + AI
+    -- strats, autogear and buffs (see CreateRaid). Destructive, so it's
     -- always behind a confirm. NOTE: a full role-based raid re-sort is not part
     -- of this chain yet (that's the separate sort feature); the build still
     -- auto-moves the player to their [P] slot.
@@ -2168,7 +2296,7 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     createBtn:SetScript("OnClick", function()
         local plan = readPlan()
         if #plan == 0 then ns.MsgErr("Grid is empty - nothing to create."); return end
-        StaticPopup_Show("WARDEN_CONFIRM_CREATE", nil, nil, plan)
+        StaticPopup_Show("WARDEN_CONFIRM_CREATE", ns.Persistence.GetInitRarity(), nil, plan)
     end)
 
     -- Build: the primary build kickoff, moved down from the sidebar so it sits

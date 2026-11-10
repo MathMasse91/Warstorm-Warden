@@ -52,6 +52,13 @@ ns.Engine.state = {
     specdGUIDs      = {},      -- { [guid] = true }
     assignedSpecs   = {},      -- { [guid] = { name, spec, classToken } } - session identity map
     counters        = { spawned = 0, specd = 0, skipped = 0 },
+    -- Create-raid "init first" mode (order from Feryll/Huntriss [DGEN]):
+    -- while deferSpecs is set, joining bots are only recorded in `deferred`;
+    -- their spec + strategy whispers go out after the gear init, because
+    -- `.warstormbot bot init` re-rolls a bot's talents and would undo them.
+    deferSpecs      = false,
+    deferred        = {},      -- ordered whisper items held until after init
+    onWhispersDrained = nil,   -- fire-once hook when the whisper queue empties
 }
 
 -- Tunables (seconds)
@@ -258,7 +265,7 @@ end
 -- Public API: StartBuild
 -- Returns the number of bots queued (0 if plan empty or invalid).
 -- ----------------------------------------------------------
-function ns.Engine.StartBuild(plan)
+function ns.Engine.StartBuild(plan, opts)
     local s = ns.Engine.state
     if ns.DebugF then
         local nPlan, nPlayer = 0, 0
@@ -290,6 +297,8 @@ function ns.Engine.StartBuild(plan)
     s.counters.skipped = 0
     wipe(s.specdGUIDs)
     wipe(s.whisperQueue)
+    wipe(s.deferred)
+    s.deferSpecs       = (type(opts) == "table" and opts.deferSpecs) and true or false
     s.whisperElapsed   = 0
     s.elapsed          = 0
     s.expectedSize     = nil   -- paced-summon gate: nothing outstanding yet
@@ -603,6 +612,9 @@ function ns.Engine.Stop()
     -- Abort any pending one-click "Create" chain: drop the completion hook so
     -- autogear / world buffs don't still fire, and cancel queued timers.
     s.onBuildComplete = nil
+    s.onWhispersDrained = nil
+    s.deferSpecs      = false
+    wipe(s.deferred)
     if ns.Engine.CancelTimers then ns.Engine.CancelTimers() end
     if ns.Log then ns.Log("Engine.Stop: all queues wiped") end
     DEFAULT_CHAT_FRAME:AddMessage(
@@ -657,10 +669,14 @@ local function processUnit(unit)
     local opt1 = type(entry) == "table" and entry.opt1 or nil
     local opt2 = type(entry) == "table" and entry.opt2 or nil
 
-    -- Don't whisper directly - enqueue to smooth out the rate
-    ns.Engine.PushWhisper({
-        name = name, spec = spec, opt1 = opt1, opt2 = opt2, classToken = classToken,
-    })
+    -- Don't whisper directly - enqueue to smooth out the rate. In Create's
+    -- init-first mode, hold the whisper until the bot has been gear-inited.
+    local item = { name = name, spec = spec, opt1 = opt1, opt2 = opt2, classToken = classToken }
+    if s.deferSpecs then
+        table.insert(s.deferred, item)
+    else
+        ns.Engine.PushWhisper(item)
+    end
     s.specdGUIDs[guid] = true
     s.assignedSpecs[guid] = {
         name = name, spec = spec, classToken = classToken, opt1 = opt1, opt2 = opt2,
@@ -711,6 +727,14 @@ local function whisperTick(self, elapsed)
     if #s.whisperQueue == 0 then
         s.whisperElapsed = 0
         self:SetScript("OnUpdate", nil) -- idle -> detach
+        if s.onWhispersDrained then
+            local cb = s.onWhispersDrained
+            s.onWhispersDrained = nil
+            local ok, err = pcall(cb)
+            if not ok and ns.LogError then
+                ns.LogError("onWhispersDrained error: " .. tostring(err))
+            end
+        end
         return
     end
 
@@ -840,9 +864,15 @@ local function completerTick(self, elapsed)
     if sendEmpty and whisperEmpty and (pendingSpecs == 0 or timeout) then
         s.buildActive = false
         s.sending     = false
-        DEFAULT_CHAT_FRAME:AddMessage(string.format(
-            "|cff00ff00[Warden]|r Build done: %d bots queued, %d spec'd, %d pending.",
-            s.counters.spawned, s.counters.specd, pendingSpecs))
+        if s.deferSpecs then
+            DEFAULT_CHAT_FRAME:AddMessage(string.format(
+                "|cff00ff00[Warden]|r Build done: %d bots joined, %d missing. Init + specs next.",
+                #s.deferred, pendingSpecs))
+        else
+            DEFAULT_CHAT_FRAME:AddMessage(string.format(
+                "|cff00ff00[Warden]|r Build done: %d bots queued, %d spec'd, %d pending.",
+                s.counters.spawned, s.counters.specd, pendingSpecs))
+        end
         if ns.LogF then
             ns.LogF("Build done: spawned=%d specd=%d pending=%d (timeout=%s)",
                 s.counters.spawned, s.counters.specd, pendingSpecs, tostring(timeout))
@@ -960,13 +990,57 @@ end
 
 -- ----------------------------------------------------------
 -- Public API: CreateRaid - the one-click "Create" sequence.
--- remove all bots -> (beat) -> paced StartBuild (which auto-converts to raid,
--- auto-specs, applies AI strategies) -> on completion: per-bot init -> autogear
--- -> world buffs. Each finisher is spaced via ns.Engine.After so the server
--- processes them in order. Note: a full role-based re-sort is NOT part of this
--- chain yet (that's the separate sort feature); StartBuild still auto-moves the
--- player to their [P] slot. opts = { initRarity = "epic" | nil }.
+-- Order (init-first, from Feryll/Huntriss [DGEN]): remove all bots -> paced
+-- StartBuild in deferSpecs mode (bots are only recorded as they join) ->
+-- on completion: per-bot gear init -> once the init queue has drained and the
+-- server had INIT_SETTLE seconds, whisper every spec + strategy -> once those
+-- whispers drain: autogear, Bloodlust/Heroism excluded, group buffs, soulstone,
+-- world buffs. Specs go out AFTER init because init re-rolls talents.
+-- If some bots never joined, the build still completes on BUILD_TIMEOUT and
+-- the chain runs for the bots that did. opts = { initRarity = "epic" | nil }.
 -- ----------------------------------------------------------
+local INIT_SETTLE = 3.0
+
+-- Max-rank (3.3.5a) group buff spell IDs; bots cast by ID more reliably
+-- than by name.
+local PRAYER_OF_FORTITUDE_ID = 48162
+local GIFT_OF_THE_WILD_ID    = 48470
+local PRAYER_OF_SPIRIT_ID    = 48074
+
+-- Run fn once the send queue is empty, plus `extra` seconds.
+local function afterSendDrained(extra, fn)
+    local function poll()
+        if #ns.Engine.state.sendQueue > 0 then
+            ns.Engine.After(0.5, poll)
+        else
+            ns.Engine.After(extra or 0, fn)
+        end
+    end
+    poll()
+end
+
+local function finishCreate(hasClass)
+    ns.Broadcast("autogear")
+    DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Warden]|r Create: sent autogear.")
+    ns.Engine.After(2.0, function()
+        -- Bloodlust/Heroism off by default; the BL toggle turns it back on.
+        if hasClass.SHAMAN then ns.Engine.SetBloodlust(false) end
+        if hasClass.PRIEST then ns.Broadcast("@priest cast " .. PRAYER_OF_FORTITUDE_ID) end
+        if hasClass.DRUID  then ns.Broadcast("@druid cast " .. GIFT_OF_THE_WILD_ID) end
+        if hasClass.WARLOCK then ns.Broadcast("nc +ss master") end
+    end)
+    -- Spirit a few seconds after Fortitude so the two casts don't collide.
+    if hasClass.PRIEST then
+        ns.Engine.After(5.0, function()
+            ns.Broadcast("@priest cast " .. PRAYER_OF_SPIRIT_ID)
+        end)
+    end
+    ns.Engine.After(6.5, function()
+        ns.Broadcast("nc +worldbuff")
+        DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Warden]|r Create: buffs sent. Done.")
+    end)
+end
+
 function ns.Engine.CreateRaid(plan, opts)
     opts = opts or {}
     local s    = ns.Engine.state
@@ -975,29 +1049,40 @@ function ns.Engine.CreateRaid(plan, opts)
 
     -- Clear any half-finished prior run so hooks/timers don't overlap.
     ns.Engine.CancelTimers()
-    s.onBuildComplete = nil
+    s.onBuildComplete   = nil
+    s.onWhispersDrained = nil
 
     DEFAULT_CHAT_FRAME:AddMessage(
         "|cff00ff00[Warden]|r Create: removing existing bots...")
-    SendChatMessage(".warstormbot bot remove *", chan)
+    ns.Engine.SendNow(".warstormbot bot remove *", chan)
 
-    -- Chain the gear/buff finishers onto build completion.
     s.onBuildComplete = function()
+        local items = {}
+        for i, item in ipairs(s.deferred) do items[i] = item end
+        wipe(s.deferred)
+        s.deferSpecs = false
+
+        local hasClass = {}
+        for _, item in ipairs(items) do
+            if item.classToken then hasClass[item.classToken] = true end
+        end
+
         local rarity = opts.initRarity
         if rarity then ns.Engine.InitBots(rarity) end
-        -- autogear then world buffs, spaced (and after init has a head start).
-        ns.Engine.After(rarity and 2.0 or 0.5, function()
-            if ns.Broadcast then ns.Broadcast("autogear") end
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Warden]|r Create: sent autogear.")
-        end)
-        ns.Engine.After(rarity and 4.0 or 2.5, function()
-            if ns.Broadcast then ns.Broadcast("nc +worldbuff") end
-            DEFAULT_CHAT_FRAME:AddMessage("|cff00ff00[Warden]|r Create: world buffs sent. Done.")
+
+        afterSendDrained(rarity and INIT_SETTLE or 0, function()
+            DEFAULT_CHAT_FRAME:AddMessage(string.format(
+                "|cff00ff00[Warden]|r Create: whispering %d spec(s).", #items))
+            if #items == 0 then finishCreate(hasClass); return end
+            s.onWhispersDrained = function() finishCreate(hasClass) end
+            for _, item in ipairs(items) do ns.Engine.PushWhisper(item) end
         end)
     end
 
     -- Give the remove-all a beat to process, then kick off the paced build.
-    ns.Engine.After(1.5, function() ns.Engine.StartBuild(plan) end)
+    ns.Engine.After(1.5, function()
+        ns.Engine.StartBuild(plan, { deferSpecs = true })
+    end)
 end
 
 -- ==========================================================
@@ -1076,10 +1161,11 @@ end
 local BLOODLUST_ID = 2825
 local HEROISM_ID   = 32182
 
-function ns.Engine.Bloodlust()
+-- Explicit setter: on=true lets shamans cast it, on=false excludes it.
+function ns.Engine.SetBloodlust(on)
     local db = ns.Persistence.DB
     if not db then return 0 end
-    db.bloodlust = not (db.bloodlust == true)
+    db.bloodlust = on and true or false
 
     local faction = UnitFactionGroup and UnitFactionGroup("player")
     local spellId = (faction == "Alliance") and HEROISM_ID or BLOODLUST_ID
@@ -1091,4 +1177,10 @@ function ns.Engine.Bloodlust()
         if f.footer and f.footer.refreshBL then f.footer.refreshBL() end
     end
     return n, db.bloodlust
+end
+
+function ns.Engine.Bloodlust()
+    local db = ns.Persistence.DB
+    if not db then return 0 end
+    return ns.Engine.SetBloodlust(not (db.bloodlust == true))
 end

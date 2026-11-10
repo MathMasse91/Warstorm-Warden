@@ -660,21 +660,8 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     -- buttons use in the Controls tab. Sits in the top-right of the Target
     -- card since it's a global bot action, not target-specific.
     -- ============================================================
-    local RARITIES = { "common", "uncommon", "rare", "epic" }
-    local RARITY_LABEL = {
-        common = "Common", uncommon = "Uncommon", rare = "Rare", epic = "Epic",
-    }
-    -- WoW item-quality colors so the picked tier reads at a glance.
-    local RARITY_COLOR = {
-        common   = "ffffffff", -- white
-        uncommon = "ff1eff00", -- green
-        rare     = "ff0070dd", -- blue
-        epic     = "ffa335ee", -- purple
-    }
-    local function rarityText(r)
-        return "|c" .. (RARITY_COLOR[r] or "ffffffff") .. (RARITY_LABEL[r] or r) .. "|r"
-    end
-    tabState.botInitRarity = tabState.botInitRarity or "epic"
+    -- Rarity list + saved pick are shared (ns.Data / ns.Persistence) so the
+    -- last choice sticks across the Spec tab, WardenMantle and Create.
 
     local biLbl = cardPanel.content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     biLbl:SetPoint("TOPRIGHT", cardPanel.content, "TOPRIGHT", -8, -2)
@@ -685,26 +672,31 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     rarityDrop:SetPoint("TOPRIGHT", biLbl, "BOTTOMRIGHT", 14, -2)
     ns.UI.Dropdown.style(rarityDrop, 90)
     UIDropDownMenu_Initialize(rarityDrop, function()
-        for _, r in ipairs(RARITIES) do
+        for _, r in ipairs(ns.Data.RARITIES) do
             local info = UIDropDownMenu_CreateInfo()
-            info.text  = rarityText(r)
+            info.text  = ns.Data.RarityText(r)
             info.value = r
+            info.checked = (ns.Persistence.GetInitRarity() == r)
             info.func  = function(self)
-                tabState.botInitRarity = self.value
-                UIDropDownMenu_SetText(rarityDrop, rarityText(self.value))
+                ns.Persistence.SetInitRarity(self.value)
+                UIDropDownMenu_SetText(rarityDrop, ns.Data.RarityText(self.value))
             end
             UIDropDownMenu_AddButton(info)
         end
     end)
-    UIDropDownMenu_SetText(rarityDrop, rarityText(tabState.botInitRarity))
+    UIDropDownMenu_SetText(rarityDrop, ns.Data.RarityText(ns.Persistence.GetInitRarity()))
+    -- Re-sync on show: the pick may have changed in WardenMantle meanwhile.
+    rarityDrop:HookScript("OnShow", function(self)
+        UIDropDownMenu_SetText(self, ns.Data.RarityText(ns.Persistence.GetInitRarity()))
+    end)
 
     local levelBtn = ns.UI.Button.gold(cardPanel.content, "level up", 90, 20)
     levelBtn:SetPoint("TOPRIGHT", rarityDrop, "BOTTOMRIGHT", -16, 0)
     levelBtn:SetScript("OnClick", function()
         local db     = ns.Persistence and ns.Persistence.DB
         local chan   = (db and db.commandChannel) or "SAY"
-        local rarity = tabState.botInitRarity or "epic"
-        SendChatMessage(".warstormbot bot init=" .. rarity, chan)
+        local rarity = ns.Persistence.GetInitRarity()
+        ns.Engine.SendNow(".warstormbot bot init=" .. rarity, chan)
         ns.MsgInfo(string.format("Sent `.warstormbot bot init=%s` (%s).", rarity, chan))
     end)
 

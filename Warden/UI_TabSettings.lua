@@ -390,7 +390,9 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
         "|cffe6d5a8Warden v" .. (GetAddOnMetadata("Warden", "Version") or "?") .. "|r\n"
         .. "Forked from WSSM (Patchs & Valleriaa). Merges "
         .. "WarstormBotManager (Moroes), WBM Lite and "
-        .. "OptimalRaidComposer (both by Runshouse)."
+        .. "OptimalRaidComposer (both by Runshouse). "
+        .. "Create-raid order, group buffs, soulstone and Chat Comp "
+        .. "by Feryll/Huntriss [DGEN]."
     )
 
     -- Final scroll-child height: sum of panel heights + 6 px gaps + 4 px top

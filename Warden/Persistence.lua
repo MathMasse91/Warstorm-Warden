@@ -15,7 +15,7 @@ local COMMIT_SCALARS = {
     "lastComp", "autoRaidDuringBuild", "autoSpec",
     "bloodlust", "aoe", "burn",
     "disperseDist", "minimapAngle", "masterScale", "activeTab",
-    "helpLastChapter", "whisperFilter",
+    "helpLastChapter", "whisperFilter", "initRarity", "chatCompChannel",
 }
 
 -- Subtables preserved whole; always written so freshly-added keys survive.
@@ -47,6 +47,10 @@ local function initDB()
     if type(db.masterScale)          ~= "number"  then db.masterScale = 1.0 end
     if type(db.activeTab)            ~= "number"  then db.activeTab = 1 end
     if type(db.helpLastChapter)      ~= "string"  then db.helpLastChapter = "intro" end
+    -- Last bot-init gear rarity picked anywhere (Spec / Mantle / Create).
+    if not (ns.Data and ns.Data.IsRarity and ns.Data.IsRarity(db.initRarity)) then
+        db.initRarity = "epic"
+    end
     -- WhisperBlocker: suppress bot invite whispers from senders outside your
     -- group. Off by default; opt-in from Settings because pattern matching on
     -- whisper text can theoretically catch an unwanted real whisper.
@@ -299,4 +303,18 @@ function ns.Persistence.ClearAllPlayerFlags()
     local me = UnitName and UnitName("player")
     if me then db.playerFlags[me] = true end
     return n
+end
+
+-- Shared bot-init rarity: every rarity dropdown reads and writes this one
+-- saved key, so the last pick sticks across dropdowns and sessions.
+function ns.Persistence.GetInitRarity()
+    local db = ns.Persistence.DB
+    local r  = db and db.initRarity
+    if ns.Data.IsRarity(r) then return r end
+    return "epic"
+end
+
+function ns.Persistence.SetInitRarity(r)
+    if not ns.Data.IsRarity(r) then return end
+    if ns.Persistence.DB then ns.Persistence.DB.initRarity = r end
 end

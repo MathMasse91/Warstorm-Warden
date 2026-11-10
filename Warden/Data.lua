@@ -264,6 +264,27 @@ function ns.Data.PickRotated(arr, idx)
     return arr[((idx - 1) % #arr) + 1]
 end
 
+-- Bot-init gear rarity tiers (`.warstormbot bot init=<rarity>`), shared by
+-- the Spec tab, WardenMantle and Bot Comp's Create. `legendary` is not
+-- accepted by the WarStorm server, so it's deliberately absent.
+ns.Data.RARITIES = { "common", "uncommon", "rare", "epic" }
+local RARITY_LABEL = {
+    common = "Common", uncommon = "Uncommon", rare = "Rare", epic = "Epic",
+}
+-- WoW item-quality colors so the picked tier reads at a glance.
+local RARITY_COLOR = {
+    common   = "ffffffff", -- white
+    uncommon = "ff1eff00", -- green
+    rare     = "ff0070dd", -- blue
+    epic     = "ffa335ee", -- purple
+}
+function ns.Data.IsRarity(r)
+    return type(r) == "string" and RARITY_LABEL[r] ~= nil
+end
+function ns.Data.RarityText(r)
+    return "|c" .. (RARITY_COLOR[r] or "ffffffff") .. (RARITY_LABEL[r] or tostring(r)) .. "|r"
+end
+
 -- Righteous Fury spell ID (3.3.5a). Protection paladins need it to hold
 -- threat; Ret/Holy must not have it or they'll pull aggro. We control it
 -- the same way as Bloodlust: via the bot's spell exclude list. `ss +<id>`
@@ -271,6 +292,14 @@ end
 -- will cast). The old `nc +/-rf` wording assumed a playerbots strategy
 -- flag that doesn't exist on this realm.
 local RIGHTEOUS_FURY_ID = 25780
+
+-- Max-rank (3.3.5a) spell IDs used by BuildStratCommands.
+-- Battle Shout r9 = 47436, Commanding Shout r3 = 47440.
+local SHOUT_IDS = {
+    battle     = { allow = 47436, block = 47440 },
+    commanding = { allow = 47440, block = 47436 },
+}
+local PRAYER_SHADOW_PROT_ID = 48170  -- Prayer of Shadow Protection r3
 
 -- Build the chat commands to whisper after a spec command. Returns an array.
 -- For Shaman: opt1 is a totem set, so emits `nc totems <set>`.
@@ -291,7 +320,12 @@ function ns.Data.BuildStratCommands(classToken, opt1, opt2, spec)
         end
         if opt2 and opt2 ~= "" and opt2 ~= "(none)" then
             local code = ns.Data.STRAT_CODE[opt2]
-            if code then table.insert(cmds, "nc " .. code) end
+            if code then
+                table.insert(cmds, "nc " .. code)
+                -- Paladin auras: also arm the COMBAT strategy so the aura is
+                -- held mid-fight, not only out of combat (Feryll/Huntriss).
+                if classToken == "PALADIN" then table.insert(cmds, "co " .. code) end
+            end
         end
     end
 
@@ -303,6 +337,19 @@ function ns.Data.BuildStratCommands(classToken, opt1, opt2, spec)
             -- Ret/Holy: add RF to the exclude list so they never cast it
             table.insert(cmds, "ss +" .. RIGHTEOUS_FURY_ID)
         end
+    end
+    -- Warrior shouts: the bot otherwise picks either shout. Allow the chosen
+    -- one and exclude the other via the spell exclude list (max-rank IDs).
+    local shout = SHOUT_IDS[opt1]
+    if classToken == "WARRIOR" and shout then
+        table.insert(cmds, "ss -" .. shout.allow)
+        table.insert(cmds, "ss +" .. shout.block)
+    end
+
+    -- Priest shadow res: also cast Prayer of Shadow Protection (rank 3)
+    -- right away instead of waiting for the bot's own buff cycle.
+    if classToken == "PRIEST" and opt2 == "shadow res" then
+        table.insert(cmds, "cast " .. PRAYER_SHADOW_PROT_ID)
     end
     return cmds
 end

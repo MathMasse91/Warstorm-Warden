@@ -31,29 +31,11 @@ local ROW_GAP    = 6
 local PORTRAIT   = 30
 
 -- ----------------------------------------------------------
--- Bot-init rarity tiers (copied from the Spec tab's "level up" control).
--- ----------------------------------------------------------
-local RARITIES = { "common", "uncommon", "rare", "epic" }
-local RARITY_LABEL = {
-    common = "Common", uncommon = "Uncommon", rare = "Rare", epic = "Epic",
-}
-local RARITY_COLOR = {
-    common   = "ffffffff", -- white
-    uncommon = "ff1eff00", -- green
-    rare     = "ff0070dd", -- blue
-    epic     = "ffa335ee", -- purple
-}
-local function rarityText(r)
-    return "|c" .. (RARITY_COLOR[r] or "ffffffff") .. (RARITY_LABEL[r] or r) .. "|r"
-end
-
--- ----------------------------------------------------------
 -- State
 -- ----------------------------------------------------------
 local frame          -- top-level HUD frame
 local tilePool = {}  -- reusable spec-tile buttons
 local tileCursor = 0
-local initRarity = "epic"
 
 -- ----------------------------------------------------------
 -- Helpers
@@ -322,18 +304,23 @@ local function buildBody()
     local rarityDrop = CreateFrame("Frame", "WardenMantleRarityDrop", frame, "UIDropDownMenuTemplate")
     ns.UI.Dropdown.style(rarityDrop, 96)
     UIDropDownMenu_Initialize(rarityDrop, function()
-        for _, r in ipairs(RARITIES) do
+        for _, r in ipairs(ns.Data.RARITIES) do
             local info = UIDropDownMenu_CreateInfo()
-            info.text  = rarityText(r)
+            info.text  = ns.Data.RarityText(r)
             info.value = r
+            info.checked = (ns.Persistence.GetInitRarity() == r)
             info.func  = function(self)
-                initRarity = self.value
-                UIDropDownMenu_SetText(rarityDrop, rarityText(self.value))
+                ns.Persistence.SetInitRarity(self.value)
+                UIDropDownMenu_SetText(rarityDrop, ns.Data.RarityText(self.value))
             end
             UIDropDownMenu_AddButton(info)
         end
     end)
-    UIDropDownMenu_SetText(rarityDrop, rarityText(initRarity))
+    UIDropDownMenu_SetText(rarityDrop, ns.Data.RarityText(ns.Persistence.GetInitRarity()))
+    -- Re-sync on show: the pick may have changed in the Spec tab meanwhile.
+    rarityDrop:HookScript("OnShow", function(self)
+        UIDropDownMenu_SetText(self, ns.Data.RarityText(ns.Persistence.GetInitRarity()))
+    end)
     frame.rarityDrop = rarityDrop
 
     -- Compact "RB" button (was "ResetBot"): label stays tiny to shrink the
@@ -341,7 +328,7 @@ local function buildBody()
     local resetBtn = ns.UI.Button.gold(frame, "RB", 30, 20)
     resetBtn:SetScript("OnClick", function()
         local chan = (db() and db().commandChannel) or "SAY"
-        local rarity = initRarity or "epic"
+        local rarity = ns.Persistence.GetInitRarity()
         ns.Engine.SendNow(".warstormbot bot init=" .. rarity, chan)
         ns.MsgInfo(string.format("Sent `.warstormbot bot init=%s` (%s).", rarity, chan))
     end)
