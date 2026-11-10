@@ -645,10 +645,10 @@ local function whisperTick(self, elapsed)
 
     local item = table.remove(s.whisperQueue, 1)
     if item and item.name and item.spec then
-        SendChatMessage("talents spec " .. item.spec, "WHISPER", nil, item.name)
+        SendChatMessage(ns.Engine.SpecCommand(item.name, item.spec), ns.Engine.CommandChannel())
         s.counters.specd = s.counters.specd + 1
         if ns.LogF then
-            ns.LogF("whisper sent: 'talents spec %s' to %s (whispers left: %d)",
+            ns.LogF("spec init sent: '%s' for %s (left: %d)",
                 item.spec, item.name, #s.whisperQueue)
         end
 
@@ -891,6 +891,26 @@ function ns.Engine.InitCommand(rarity, name, spec)
     return cmd
 end
 
+-- A spec change is an init: `talents spec` alone keeps (or resets) the gear
+-- for the old spec, so every spec swap re-gears at the saved rarity with the
+-- new spec in one server command.
+function ns.Engine.SpecCommand(name, spec)
+    return ns.Engine.InitCommand(ns.Persistence.GetInitRarity(), name, ns.Data.ServerSpec(spec))
+end
+
+-- Apply a spec to one bot (skips human-flagged names). immediate = send now
+-- (single user click); otherwise throttled through the send queue (routed as
+-- a table so a mid-build send never arms the bot-join gate).
+function ns.Engine.ApplySpec(name, spec, immediate)
+    if type(name) ~= "string" or name == "" or type(spec) ~= "string" or spec == "" then return end
+    if ns.Persistence and ns.Persistence.IsPlayerName
+       and ns.Persistence.IsPlayerName(name) then return end
+    local cmd = ns.Engine.SpecCommand(name, spec)
+    if immediate then ns.Engine.SendNow(cmd)
+    else ns.Engine.Queue(cmd, ns.Engine.CommandChannel()) end
+    return cmd
+end
+
 -- Spec Warden knows for a unit: tracked assignment (by GUID) first.
 local function trackedSpec(unit)
     local a = ns.Engine.Tracked(UnitGUID(unit))
@@ -900,8 +920,8 @@ end
 -- Queues one init per bot in the group (skips the player and human-flagged
 -- names), throttled through the send queue so a 25-man init doesn't blast
 -- the server in one frame. specByName (optional) overrides the spec per
--- bot name; otherwise the tracked spec is used, else a bare init (random
--- spec). Returns (count, countWithSpec).
+-- bot name; otherwise the tracked spec is used. Bots with no known spec are
+-- skipped (a bare init re-rolls a random spec). Returns (count, countWithSpec).
 function ns.Engine.InitBots(rarity, specByName)
     local n, withSpec = 0, 0
     local function consider(unit)
@@ -912,9 +932,10 @@ function ns.Engine.InitBots(rarity, specByName)
         if ns.Persistence and ns.Persistence.IsPlayerName
            and ns.Persistence.IsPlayerName(name) then return end
         local spec = (specByName and specByName[name]) or trackedSpec(unit)
-        ns.Engine.Queue(ns.Engine.InitCommand(rarity, name, ns.Data.ServerSpec(spec)))
         n = n + 1
-        if spec then withSpec = withSpec + 1 end
+        if not spec then return end  -- bare init = random spec: skip
+        ns.Engine.Queue(ns.Engine.InitCommand(rarity, name, ns.Data.ServerSpec(spec)))
+        withSpec = withSpec + 1
     end
     if ns.Engine.IsInRaid() then
         for i = 1, GetNumRaidMembers() do consider("raid" .. i) end
@@ -922,8 +943,8 @@ function ns.Engine.InitBots(rarity, specByName)
         for i = 1, GetNumPartyMembers() do consider("party" .. i) end
     end
     DEFAULT_CHAT_FRAME:AddMessage(string.format(
-        "|cff00ff00[Warden]|r Init: queued init=%s for %d bot(s) (%d with spec).",
-        tostring(rarity), n, withSpec))
+        "|cff00ff00[Warden]|r Init: queued init=%s for %d of %d bot(s); %d skipped (unknown spec - pick one in Mantle/Spec first).",
+        tostring(rarity), withSpec, n, n - withSpec))
     if ns.LogF then ns.LogF("InitBots: queued init=%s for %d bots (%d with spec)", tostring(rarity), n, withSpec) end
     return n, withSpec
 end
@@ -933,8 +954,12 @@ end
 function ns.Engine.Regear(name, guid)
     local rarity = ns.Persistence.GetInitRarity()
     if not name then return ns.Engine.InitBots(rarity) end
-    local a   = ns.Engine.Tracked(guid)
-    local cmd = ns.Engine.InitCommand(rarity, name, ns.Data.ServerSpec(a and a.spec))
+    local a = ns.Engine.Tracked(guid)
+    if not (a and a.spec) then
+        ns.MsgWarn(name .. ": spec unknown - click a spec tile instead (it re-gears at the selected rarity).")
+        return 0
+    end
+    local cmd = ns.Engine.InitCommand(rarity, name, ns.Data.ServerSpec(a.spec))
     ns.Engine.SendNow(cmd)
     ns.MsgInfo(string.format("Sent `%s`.", cmd))
     return 1

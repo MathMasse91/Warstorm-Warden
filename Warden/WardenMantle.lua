@@ -186,7 +186,7 @@ local function layoutSpecRow(entries, class, modeLabel, topY, label)
 
         t.cap:SetText(ns.Data.SpecCaption(e.base))
         ns.UI.Tooltip.Attach(t, ns.Data.SpecCaption(e.base) .. " (" .. modeLabel .. ")",
-            function() return "Whisper talents spec to " .. (resolveTarget() or "target") .. "." end,
+            function() return "Sends `.warstormbot bot init=" .. ns.Persistence.GetInitRarity() .. " " .. (resolveTarget() or "<target>") .. " <spec>`: spec + gear at the selected rarity." end,
             "ANCHOR_TOP")
 
         local spec = e.spec
@@ -209,7 +209,7 @@ local function layoutSpecRow(entries, class, modeLabel, topY, label)
             fn(name, true)  -- immediate=true: un-throttled whisper (no WM button throttles)
 
             ns.Engine.TrackSpec(guid, name, spec, class)
-            ns.MsgInfo(string.format("Sent `talents spec %s` -> %s.",
+            ns.MsgInfo(string.format("Sent spec %s (" .. ns.Persistence.GetInitRarity() .. " gear) -> %s.",
                 spec, ns.ColorClass(class, name)))
         end)
         t:Show()

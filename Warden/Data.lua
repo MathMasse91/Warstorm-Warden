@@ -77,11 +77,8 @@ ns.Data.DEFAULT_SPEC_PVE = {
 local function whisperSpec(specServerName, targetName, immediate)
     local target = targetName or UnitName("target")
     if not target then return end
-    if immediate then
-        ns.Engine.WhisperNow(target, "talents spec " .. specServerName)
-    else
-        ns.Engine.Queue("talents spec " .. specServerName, "WHISPER", target)
-    end
+    -- Spec + gear in one server init at the saved rarity (see Engine.SpecCommand).
+    ns.Engine.ApplySpec(target, specServerName, immediate)
 end
 
 local function mkSpec(serverName)

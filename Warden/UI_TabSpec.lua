@@ -141,7 +141,7 @@ local function refreshTargetCard()
         s.metaLbl:SetText(string.format("- %s - %s",
             ns.ColorClass(classTok or "", className),
             faction ~= "" and faction or "Unknown"))
-        s.hintLbl:SetText("whisper |cffffd100talents spec <name>|r -> applies + tracks by GUID")
+        s.hintLbl:SetText("|cffffd100init=<rarity> <name> <spec>|r -> spec + gear, tracked by GUID")
 
         pushHistory(name)
     else
@@ -306,7 +306,7 @@ local function rebuildTilesFor(classToken)
             fn(targetName)  -- pass resolved name so mouseover works, not just hard target
 
             ns.Engine.TrackSpec(targetGUID, targetName, specName, classToken)
-            ns.MsgInfo(string.format("Sent `talents spec %s` -> %s.",
+            ns.MsgInfo(string.format("Sent spec %s (" .. ns.Persistence.GetInitRarity() .. " gear) -> %s.",
                 specName, ns.ColorClass(classToken, targetName)))
 
             -- BUG: the gold rim used to stay on the class's PvE default even

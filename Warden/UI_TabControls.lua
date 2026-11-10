@@ -420,8 +420,8 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
                 e.func = function()
                     -- Through Engine (human-player guard); tracked as the same
                     -- "<spec> pve" string the Build / Spec tab store.
-                    ns.Engine.WhisperNow(targetName, "talents spec " .. s .. " pve")
-                    ns.MsgInfo(string.format("Sent `talents spec %s pve` to %s.", s, targetName))
+                    local cmd = ns.Engine.ApplySpec(targetName, s .. " pve", true)
+                    if cmd then ns.MsgInfo(string.format("Sent `%s`.", cmd)) end
                     ns.Engine.TrackSpec(targetGUID, targetName, s .. " pve", classTok)
                 end
                 UIDropDownMenu_AddButton(e)
