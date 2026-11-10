@@ -172,7 +172,6 @@ local SIZE_LAYOUT = {
 -- Module state
 -- ----------------------------------------------------------
 local state = {
-    pane       = nil,
     size       = 25,
     cols       = 5,
     rows       = 5,
@@ -181,12 +180,9 @@ local state = {
     nameBox    = nil,
     sizeSeg    = nil,
     presetDrop = nil,
-    gridPanel  = nil,
     gridInner  = nil,
-    chipPanel  = nil,
     sidebar    = {},
     slotFrames = {},
-    chipFrames = {},
     -- FEATURE-01 Part B: drag-and-drop bookkeeping. Set by chip
     -- OnDragStart, consumed by slot OnMouseUp / chip OnDragStop.
     drag       = nil,   -- { classToken = "PALADIN" } | nil
@@ -289,7 +285,6 @@ buildSlotWidget = function(parent, index)
     pText:SetPoint("CENTER", pBadge, "CENTER", 0, 0)
     pText:SetText("P")
     pText:SetTextColor(1, 0.82, 0, 1)
-    pBadge.text = pText
     f.pBadge = pBadge
 
     -- Short "+" placeholder (shown when empty).
@@ -492,11 +487,6 @@ local function layoutGrid()
     -- Column header labels (TOP bar, one per group). Spec §8.
     local labels = (SIZE_LAYOUT[state.size] or SIZE_LAYOUT[25]).labels or {}
     inner._colLbls = inner._colLbls or {}
-    -- Hide any stray row labels from the short-lived left-gutter layout
-    if inner._rowLbls then
-        for _, lbl in pairs(inner._rowLbls) do lbl:Hide() end
-    end
-
     local headerH = 16
     local slotW   = math.floor((cW - (cols + 1) * gap) / cols)
     local slotH   = math.floor((cH - headerH - (rows + 1) * gap) / rows)
@@ -1606,10 +1596,9 @@ StaticPopupDialogs["WARDEN_CONFIRM_CREATE"] = {
 -- BuildInto
 -- ----------------------------------------------------------
 function ns.UI.Tabs.Comp.BuildInto(pane)
-    state.pane = pane
     applySizeLayout(25)
 
-    local PW, PH = pane:GetWidth(), pane:GetHeight()
+    local PW = pane:GetWidth()
 
     -- ============================================================
     -- Header row: comp name + presets + size + grid/table toggle
@@ -1669,7 +1658,6 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     -- Grid panel
     local gridPanel = ns.UI.Panel.Create(pane, gridW, mainH, "Raid grid")
     gridPanel:SetPoint("TOPLEFT", pane, "TOPLEFT", 12, mainY)
-    state.gridPanel = gridPanel
 
     -- Carve out inner area (top = grid, bottom = tray)
     local gridInner = CreateFrame("Frame", nil, gridPanel.content)
@@ -1700,7 +1688,6 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
         chip:SetPoint("TOPLEFT", trayRow, "TOPLEFT",
             chipStartX + col * (chipW + chipGap),
             -row * (chipH + 2))
-        state.chipFrames[i] = chip
     end
 
     -- Previous "shift+click - N copies" BOTTOMRIGHT label sat on top of the
@@ -1924,7 +1911,6 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     actionBar:SetHeight(60)
     actionBar:SetPoint("BOTTOMLEFT",  pane, "BOTTOMLEFT",  12, 6)
     actionBar:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -12, 6)
-    state.actionBar = actionBar
 
     local barBg = actionBar:CreateTexture(nil, "BACKGROUND")
     barBg:SetTexture("Interface\\Buttons\\WHITE8x8")

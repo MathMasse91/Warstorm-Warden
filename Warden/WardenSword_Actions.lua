@@ -12,10 +12,10 @@ ns.WardenSword = ns.WardenSword or {}
 
 local A = {}
 
-A.summon = function() ns.Engine.WhisperAll("summon") end
-A.follow = function() ns.Engine.WhisperAll("follow") end
-A.stay   = function() ns.Engine.WhisperAll("stay")   end
-A.flee   = function() ns.Engine.WhisperAll("flee")   end
+A.summon = function() ns.Broadcast("summon") end
+A.follow = function() ns.Broadcast("follow") end
+A.stay   = function() ns.Broadcast("stay")   end
+A.flee   = function() ns.Broadcast("flee")   end
 A.aoe    = function() return ns.Engine.ToggleAoE()   end
 A.burn   = function() return ns.Engine.ToggleBurn()  end
 A.skull  = function() ns.Engine.MarkAndAttack("skull") end

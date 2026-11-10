@@ -20,7 +20,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     if not db then return end
     built = true  -- only latch once we've committed to building (db present)
 
-    local paneW, paneH = pane:GetWidth(), pane:GetHeight()
+    local paneW = pane:GetWidth()
 
     -- Total panel heights exceed pane so we host everything inside a
     -- ScrollFrame. Bottom offset 32 clears the master footer so the
@@ -223,7 +223,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     -- Same thin adapter on ns.UI.Check.Make, driving the sword sub-table.
     local function mkSwordCheck(label, x, y, key, hook, tip)
         local opts = { tip = tip, echo = false }
-        if hook and hook ~= "nil" and ns.WardenSword and ns.WardenSword[hook] then
+        if hook and ns.WardenSword and ns.WardenSword[hook] then
             opts.onToggle = function() ns.WardenSword[hook]() end
         end
         local cb = ns.UI.Check.Make(swordP.content,
@@ -238,9 +238,9 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
         "TANK / HEAL / DPS rows for quick attack / stay orders.")
     mkSwordCheck("Show status strip",        4, -26, "showStatus",     "ApplyLayout",
         "Live row under the header with BOTS / AoE / BL / Queue.")
-    mkSwordCheck("Start locked",           220, -26, "startLocked",    "nil",
+    mkSwordCheck("Start locked",           220, -26, "startLocked",    nil,
         "Apply the lock at login so accidental drags don't happen mid-fight.")
-    mkSwordCheck("Hide Warden minimap button in combat", 4, -50, "hideMinimapCombat", "nil",
+    mkSwordCheck("Hide Warden minimap button in combat", 4, -50, "hideMinimapCombat", nil,
         "Hides the main minimap button when combat starts so it can't be mis-clicked.")
 
     -- Density dropdown
@@ -400,13 +400,3 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     content:SetHeight(4 + 130 + 6 + 280 + 6 + 70 + 6 + 180 + 6 + 96 + 6 + 80 + 8)
 end
 
-function ns.UI.Tabs.Settings.OnShow(pane)
-    local db = ns.Persistence.DB
-    if not db then return end
-    local a = _G["WardenSetting_autoSpec"]
-    if a then a:SetChecked(db.autoSpec == true) end
-    local b = _G["WardenSetting_autoRaidDuringBuild"]
-    if b then b:SetChecked(db.autoRaidDuringBuild == true) end
-    local w = _G["WardenSetting_whisperFilter"]
-    if w then w:SetChecked(db.whisperFilter == true) end
-end

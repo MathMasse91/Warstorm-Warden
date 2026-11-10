@@ -12,7 +12,7 @@
 -- (drag / lock / position / public API) clones WardenSword.lua.
 --
 -- Invariant: this file contains ZERO direct SendChatMessage calls - every
--- outbound message routes through ns.Engine.Queue / ns.Engine.WhisperAll /
+-- outbound message routes through ns.Engine.Queue / ns.Broadcast /
 -- ns.Engine.WhisperNow / SPEC_EXEC.
 -- =====================================================
 

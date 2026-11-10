@@ -509,7 +509,6 @@ function ns.UI.Panel.Create(parent, w, h, headerText)
         rule:SetHeight(1)
         rule:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -2)
         rule:SetPoint("RIGHT",   frame,  "RIGHT",     -8, 0)
-        frame.headerRule = rule
     end
 
     local content = CreateFrame("Frame", nil, frame)
@@ -537,13 +536,7 @@ function ns.UI.Banner.Create(parent, variant)
     local f = CreateFrame("Frame", nil, parent)
     f:SetHeight(16)
 
-    f:SetBackdrop({
-        bgFile   = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = nil,
-    })
-    -- A backdrop with no color renders opaque white; keep the base clear so
-    -- only the translucent gradient layers below tint the strip.
-    f:SetBackdropColor(0, 0, 0, 0)
+    -- No backdrop: only the translucent gradient layers below tint the strip.
 
     -- Two-layer gradient simulation since 3.3.5 lacks SetGradient.
     local top = f:CreateTexture(nil, "BACKGROUND")
@@ -587,7 +580,6 @@ function ns.UI.Banner.Create(parent, variant)
     f.lblR = lblR
 
     function f:SetVariant(v)
-        self._variant = v
         local color
         if v == "green" then color = ns.Tokens.green
         elseif v == "red" then color = ns.Tokens.ink_red
@@ -644,7 +636,6 @@ function ns.UI.Segmented.Create(parent, items, onChange)
     f:SetBackdropColor(T.stone_mid[1], T.stone_mid[2], T.stone_mid[3], 1)
     f:SetBackdropBorderColor(T.stone_rim[1], T.stone_rim[2], T.stone_rim[3], 1)
 
-    f._items   = items
     f._buttons = {}
     f._active  = items[1] and items[1].key or nil
 
@@ -668,7 +659,6 @@ function ns.UI.Segmented.Create(parent, items, onChange)
             end
         end
     end
-    f._paintAll = paintAll
 
     for i, it in ipairs(items) do
         local b = CreateFrame("Button", nil, f)
@@ -902,16 +892,6 @@ function ns.UI.RichText.Format(s)
     end)
     s = s:gsub("\1", "|")
     return s
-end
-
--- HairRule: 1px gold-rim divider. Caller anchors the returned Texture.
-function ns.UI.HairRule(parent, alpha)
-    local t = parent:CreateTexture(nil, "ARTWORK")
-    t:SetTexture("Interface\\Buttons\\WHITE8x8")
-    local r, g, b = ns.Tokens.gold_rim[1], ns.Tokens.gold_rim[2], ns.Tokens.gold_rim[3]
-    t:SetVertexColor(r, g, b, alpha or 0.5)
-    t:SetHeight(1)
-    return t
 end
 
 -- ----------------------------------------------------------

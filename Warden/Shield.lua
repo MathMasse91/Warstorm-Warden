@@ -38,12 +38,10 @@ local MAX_LINES       = 200      -- spec §12: cap to prevent runaway accumulati
 local FILTER_THRESHOLD = 20      -- show filter editbox only above this many items
 
 -- ----------------------------------------------------------
--- Module state. `state.shieldDB` is set during build() to point at the
--- persisted sub-table; everything else is runtime-only.
+-- Module state, runtime-only (persisted settings live in shieldDB()).
 -- ----------------------------------------------------------
 local state = {
     frame        = nil,
-    shieldDB     = nil,
     target       = nil,         -- frozen target name for the active capture
     targetClass  = nil,         -- classToken for class-colored display
     mode         = nil,         -- "los" | "spells" | nil
@@ -52,8 +50,6 @@ local state = {
     rowFrames    = {},          -- pool of clickable list rows
     losBtn       = nil,
     spellsBtn    = nil,
-    clearBtn     = nil,
-    pickBtn      = nil,
     targetLbl    = nil,         -- top line of target row (class-colored name)
     targetSub    = nil,         -- bottom line (LIVE / LOCKED indicator)
     statusLbl    = nil,         -- idle status strip (hidden when banner shown)
@@ -82,7 +78,6 @@ local state = {
     hideGray        = false,
     hideGrayBtn     = nil,
     -- Computed each refresh
-    bannedSet     = {},
     multiBot      = false,
 }
 
@@ -418,7 +413,7 @@ local function untrackExclusion(id)
     end
 end
 
-local function clickExclusion(item, idx)
+local function clickExclusion(item)
     if not state.target or state.target == "" then
         ns.MsgWarn("No target locked - click [pick] first.")
         return
@@ -537,7 +532,7 @@ rowOnClick = function(self)
     local item = state.displayItems and state.displayItems[idx]
     if not item then return end
     if item.kind == "excl" then
-        clickExclusion(item, idx)
+        clickExclusion(item)
     elseif item.kind == "line" then
         clickLine(idx)
     end
@@ -568,7 +563,6 @@ local function buildDisplayItems()
             if e.id then banned[e.id] = true end
         end
     end
-    state.bannedSet = banned
 
     -- Multi-bot detection
     local seenFrom = {}
@@ -821,7 +815,6 @@ local function ensureListener()
         table.insert(state.lines, {
             raw     = text or "",
             payload = extractPayload(text),
-            ts      = GetTime(),
             from    = state.target,
             mode    = state.mode,
         })
@@ -1034,7 +1027,6 @@ end
 
 local function build()
     if state.frame then return state.frame end
-    state.shieldDB = shieldDB()
 
     -- Fixed height computed assuming the maximum stack (banner + cast-on +
     -- filter all visible). Conditional widgets collapse via layout() but the
@@ -1111,7 +1103,6 @@ local function build()
         end
         refreshTargetLine()
     end)
-    state.pickBtn = pick
     ns.UI.Tooltip.Attach(pick, "Pick target",
         "Snapshot UnitName('target') as the bot Shield will whisper to. Click `los` or `spells` afterward to fire a discovery command.",
         "ANCHOR_TOP")
@@ -1147,7 +1138,6 @@ local function build()
     local clear = ns.UI.Button.stone(actRow, "Clear", 56, ACTION_H)
     clear:SetPoint("RIGHT", actRow, "RIGHT", -PAD, 0)
     clear:SetScript("OnClick", function() ns.Shield.Clear() end)
-    state.clearBtn = clear
     ns.UI.Tooltip.Attach(clear, "clear",
         "Wipe the captured list and stop listening. The target stays locked.",
         "ANCHOR_TOP")
