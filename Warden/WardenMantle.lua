@@ -274,7 +274,7 @@ local function buildBody()
     frame.pveLbl = divLabel("PvE")
     frame.pvpLbl = divLabel("PvP")
 
-    -- Action row: Summon + Autogear (PARTY). Autogear is a global bot action;
+    -- Action row: Summon + Autogear (group channel). Autogear is a global bot action;
     -- Summon is directed - it whispers `summon` straight to the targeted bot
     -- (that is the one you want pulled to you), not the party channel.
     local summonBtn = ns.UI.Button.stone(frame, "Summon", 60, 18)
@@ -291,8 +291,10 @@ local function buildBody()
 
     local ag = ns.UI.Button.gold(frame, "Autogear", 60, 18)
     ag:SetScript("OnClick", function()
-        ns.Engine.SendNow("autogear", "PARTY")
-        ns.MsgInfo("Sent `autogear` -> PARTY.")
+        -- Group channel (RAID in a raid): PARTY only reached your subgroup.
+        local chan = ns.Channel()
+        ns.Engine.SendNow("autogear", chan)
+        ns.MsgInfo("Sent `autogear` -> " .. chan .. ".")
     end)
     frame.autogear = ag
 

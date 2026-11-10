@@ -4,7 +4,7 @@
 --   Target card:  60x60 portrait + 22px gold-rim level badge overlay
 --                 [class-colored name] [- Class - Faction] mono
 --                 "whisper talents spec <name> -> applies + tracks by GUID" mono
---                 < prev target - history  - spacer - autogear -> PARTY - buffs -> RAID
+--                 < prev target - history  - spacer - Autogear - World Buffs
 --   Specs panel (header + "N available" meta):
 --                 4-col grid of tiles
 --                 Each tile: class-colored name, "pve - hint" subtitle,
@@ -374,7 +374,10 @@ end
 
 local function refreshForTarget()
     local pane = tabState.pane
-    if not pane or not pane:IsShown() then return end
+    -- IsVisible, not IsShown: the pane stays "shown" while the master window
+    -- is closed, so target changes used to rebuild the card in the background.
+    -- The pane's OnShow hook (BuildInto) refreshes it when it reappears.
+    if not pane or not pane:IsVisible() then return end
     if ns.DebugF then
         local hasT = UnitExists("target") and UnitIsPlayer("target")
         ns.DebugF("spec", "refreshForTarget: target=%s",
@@ -409,6 +412,9 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     built = true
 
     tabState.pane = pane
+    -- Refresh on every reappearance (tab switch or master window reopen),
+    -- since refreshForTarget skips work while the pane isn't visible.
+    pane:HookScript("OnShow", function() refreshForTarget() end)
     local paneW = pane:GetWidth()
     local paneH = pane:GetHeight()
 
@@ -638,18 +644,19 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
 
     -- Autogear / Buffs (right side) - anchored below cardPanel like the pair
     -- on the left, so all four buttons sit on the same baseline in the gap.
-    local buffsBtn = ns.UI.Button.stone(cardPanel, "buffs -> RAID", 110, 20)
+    local buffsBtn = ns.UI.Button.stone(cardPanel, "World Buffs", 110, 20)
     buffsBtn:SetPoint("TOPRIGHT", cardPanel, "BOTTOMRIGHT", -4, -6)
     buffsBtn:SetScript("OnClick", function()
-        SendChatMessage("nc +worldbuff", ns.Channel())
+        ns.Broadcast("nc +worldbuff")
         ns.MsgInfo("Broadcast `nc +worldbuff` to " .. ns.Channel() .. ".")
     end)
 
-    local autogearBtn = ns.UI.Button.stone(cardPanel, "autogear -> PARTY", 130, 20)
+    local autogearBtn = ns.UI.Button.stone(cardPanel, "Autogear", 110, 20)
     autogearBtn:SetPoint("RIGHT", buffsBtn, "LEFT", -4, 0)
     autogearBtn:SetScript("OnClick", function()
-        SendChatMessage("autogear", "PARTY")
-        ns.MsgInfo("Broadcast `autogear` to PARTY.")
+        -- Group channel: hardcoded PARTY only reached your own raid subgroup.
+        ns.Broadcast("autogear")
+        ns.MsgInfo("Broadcast `autogear` to " .. ns.Channel() .. ".")
     end)
 
     -- ============================================================

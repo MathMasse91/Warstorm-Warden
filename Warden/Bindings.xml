@@ -15,6 +15,12 @@
         <Binding name="WARDEN_TAB_ROSTER">
             if WARDEN_ShowTab then WARDEN_ShowTab("Roster") end
         </Binding>
+        <Binding name="WARDEN_TAB_SETTINGS">
+            if WARDEN_ShowTab then WARDEN_ShowTab("Settings") end
+        </Binding>
+        <Binding name="WARDEN_TAB_HELP">
+            if WARDEN_ShowTab then WARDEN_ShowTab("Help") end
+        </Binding>
 
         <!-- Quick bot commands - route through WARDENSWORD_Run so they inherit
              the throttled Engine.Queue path, player-flag skip semantics, and
@@ -37,15 +43,16 @@
         </Binding>
 
         <!-- Real-Time Strategy Control shortcuts (no HUD action equivalent,
-             so they call Engine.Enqueue directly to still respect throttle). -->
+             so they go through the WARDEN_Enqueue global - the addon's `ns`
+             table is private and isn't visible from binding snippets). -->
         <Binding name="WARDEN_RTSC_ON">
-            if ns and ns.Engine and ns.Engine.Enqueue then ns.Engine.Enqueue("rtsc") end
+            if WARDEN_Enqueue then WARDEN_Enqueue("rtsc") end
         </Binding>
         <Binding name="WARDEN_RTSC_SAVE">
-            if ns and ns.Engine and ns.Engine.Enqueue then ns.Engine.Enqueue("rtsc save 1") end
+            if WARDEN_Enqueue then WARDEN_Enqueue("rtsc save 1") end
         </Binding>
         <Binding name="WARDEN_RTSC_GO">
-            if ns and ns.Engine and ns.Engine.Enqueue then ns.Engine.Enqueue("rtsc go 1") end
+            if WARDEN_Enqueue then WARDEN_Enqueue("rtsc go 1") end
         </Binding>
 
         <!-- ================================================== -->

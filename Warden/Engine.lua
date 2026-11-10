@@ -16,8 +16,12 @@ function ns.Engine.IsInRaid()
 end
 
 function ns.Engine.IsLeader()
-    if type(UnitIsGroupLeader) == "function" then return UnitIsGroupLeader("player") end
-    if type(IsPartyLeader) == "function" then return IsPartyLeader() end
+    -- 3.3.5a: UnitIsGroupLeader doesn't exist; IsPartyLeader only covers
+    -- parties, so a raid has to be asked through IsRaidLeader.
+    if GetNumRaidMembers and GetNumRaidMembers() > 0 then
+        return (IsRaidLeader and IsRaidLeader()) and true or false
+    end
+    if type(IsPartyLeader) == "function" then return IsPartyLeader() and true or false end
     return false
 end
 
@@ -177,10 +181,16 @@ local function sendTick(self, elapsed)
         msg = item
     end
     SendChatMessage(msg, ch or (db and db.commandChannel) or "SAY", nil, tgt)
-    s.lastAddSentAt    = GetTime()
-    s.counters.spawned = s.counters.spawned + 1
-    -- Arm the join gate for the next send only while building (see above).
-    s.expectedSize = s.buildActive and (size + 1) or nil
+    -- Only bot-add commands (bare strings from buildQueues) grow the group.
+    -- Routed sends (tables: e.g. a Spec-tab spec whisper queued mid-build)
+    -- must not arm the join gate, or the queue stalls ~8s and reports a
+    -- false "missed its invite".
+    local isAdd = s.buildActive and type(item) ~= "table"
+    if isAdd then
+        s.lastAddSentAt    = GetTime()
+        s.counters.spawned = s.counters.spawned + 1
+    end
+    s.expectedSize = isAdd and (size + 1) or nil
 end
 
 function ns.Engine.ArmSendTicker()
@@ -267,6 +277,10 @@ end
 -- ----------------------------------------------------------
 function ns.Engine.StartBuild(plan, opts)
     local s = ns.Engine.state
+    if type(plan) ~= "table" then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffffaa00[Warden]|r Build aborted: no plan.")
+        return 0
+    end
     if ns.DebugF then
         local nPlan, nPlayer = 0, 0
         if type(plan) == "table" then
@@ -305,7 +319,7 @@ function ns.Engine.StartBuild(plan, opts)
 
     s.rosterBefore = snapshotRoster()
 
-    if ns.Log then
+    if ns.LogIsEnabled and ns.LogIsEnabled() then
         local rosterCount = 0
         for _ in pairs(s.rosterBefore) do rosterCount = rosterCount + 1 end
         ns.LogF("StartBuild: plan has %d rows, roster snapshot size=%d", #plan, rosterCount)
@@ -321,7 +335,7 @@ function ns.Engine.StartBuild(plan, opts)
         return 0
     end
 
-    if ns.Log then
+    if ns.LogIsEnabled and ns.LogIsEnabled() then
         local specQueueStr = ""
         for classToken, q in pairs(s.specQueue) do
             local specs = {}
@@ -1141,10 +1155,11 @@ function ns.Engine.MarkAndAttack(mark)
     ns.Broadcast("attack rti target")
 end
 
--- Kept as an alias because Bindings.xml + RTSC bindings still reference it.
-function ns.Engine.Enqueue(msg, channel, target)
+-- Binding glue for the RTSC keybinds (Bindings.xml can't see `ns`). RTSC
+-- commands are bot chat commands, so they go to the group channel, throttled.
+function WARDEN_Enqueue(msg)
     if not msg or msg == "" then return end
-    ns.Engine.Queue(msg, channel, target)
+    ns.Engine.Queue(msg, ns.Channel())
 end
 
 -- Bloodlust / Heroism toggle. Shaman-only; priest/mage equivalents don't

@@ -231,11 +231,10 @@ local applySizeLayout
 applySizeLayout = function(size)
     local L = SIZE_LAYOUT[size] or SIZE_LAYOUT[25]
     state.size, state.cols, state.rows = size, L.cols, L.rows
-    -- Resize slots array to match
-    if #state.slots > size then
-        for i = size + 1, #state.slots do state.slots[i] = nil end
-    end
-    for i = 1, size do state.slots[i] = state.slots[i] or nil end
+    -- Drop slots past the new size. Explicit 40 bound: `#` is unreliable on
+    -- a table with holes, which used to leave stale slots that came back on
+    -- re-grow.
+    for i = size + 1, 40 do state.slots[i] = nil end
     if state.selected and state.selected > size then state.selected = nil end
 end
 
@@ -1181,13 +1180,13 @@ local function buildSlotDetail(parent)
     d.moveBtn:SetPoint("TOPLEFT", d.opt2Drop, "BOTTOMLEFT", 16, -8)
     d.moveBtn:SetScript("OnClick", function()
         if not state.selected or not state.slots[state.selected] then return end
-        -- Move = shift slot to next empty position at end
+        -- Move = shift slot to the next empty position AFTER it (wrapping).
+        -- The old scan from index 1 moved it backwards or back onto itself.
         local src = state.selected
-        local s   = state.slots[src]
-        state.slots[src] = nil
-        for i = 1, state.size do
+        for k = 1, state.size - 1 do
+            local i = ((src - 1 + k) % state.size) + 1
             if not state.slots[i] then
-                state.slots[i] = s
+                state.slots[i], state.slots[src] = state.slots[src], nil
                 state.selected = i
                 break
             end
@@ -1400,7 +1399,10 @@ local COV_GROUPS = {
 -- or more of the 15 mock chips (see WARDEN_1.1_PLAN.md workstream C3).
 local function scanCoverageMap()
     local f = {}
-    for _, slot in ipairs(state.slots) do
+    -- Numeric loop: slots has holes (removed / dragged-out slots), which
+    -- would stop ipairs at the first gap.
+    for i = 1, state.size do
+        local slot = state.slots[i]
         if slot and slot.classToken then
             local cls  = slot.classToken
             local o1   = splitSet(slot.opt1)
@@ -1415,6 +1417,7 @@ local function scanCoverageMap()
                 if o2.retribution  then f.retrib   = true end
                 if o2["fire res"]  then f.fireres  = true end
                 if o2["frost res"] then f.frostres = true end
+                if o2["shadow res"] then f.shadres = true end
             elseif cls == "WARRIOR" then
                 if o1.battle       then f.bshout   = true end
                 if o1.commanding   then f.command  = true end
@@ -1476,7 +1479,7 @@ refreshSummary = function()
     local s = state.sidebar.summary
     if not s then return end
     local filled = 0
-    for _, slot in ipairs(state.slots) do if slot then filled = filled + 1 end end
+    for i = 1, state.size do if state.slots[i] then filled = filled + 1 end end
     -- TASKS.md §2.5: widen the slash separator so "24 / 25" is scannable.
     s.numLbl:SetText(string.format("|cffffd100%d|r |cff9b8b67/ %d|r", filled, state.size))
     if s.buildBtn then
@@ -1504,7 +1507,7 @@ end
 -- ----------------------------------------------------------
 -- Is the current grid non-empty? Used to gate the load-confirm popup.
 local function compHasSlots()
-    for _, s in ipairs(state.slots) do if s then return true end end
+    for i = 1, state.size do if state.slots[i] then return true end end
     return false
 end
 
@@ -2165,9 +2168,10 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     end)
 
     clearBtn:SetScript("OnClick", function()
+        -- Local only (as the tooltip says): GUID tracking used by Roster /
+        -- Re-Spec is NOT wiped here - Settings > Maintenance does that.
         wipe(state.slots)
         state.selected = nil
-        if ns.Engine and ns.Engine.ClearTracking then ns.Engine.ClearTracking() end
         refreshAll()
     end)
 

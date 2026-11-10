@@ -149,8 +149,10 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
 
     -- Three inline groups. Each group = small uppercase label + 2 .xs buttons.
     local groups = {
-        { label = "aoe",     on = { "ON",    "co +aoe,-assist,-focus,?" }, off = { "off",       "co -aoe,+assist,+focus,?" } },
-        { label = "burn cd", on = { "burn",  "co +boost,?" },              off = { "stop",      "co -boost,?" }               },
+        -- dbKey: AoE / Burn share their saved state with the WardenSword HUD
+        -- toggles, so a click here must update it too or the two drift apart.
+        { label = "aoe",     dbKey = "aoe",  on = { "ON",    "co +aoe,-assist,-focus,?" }, off = { "off",       "co -aoe,+assist,+focus,?" } },
+        { label = "burn cd", dbKey = "burn", on = { "burn",  "co +boost,?" },              off = { "stop",      "co -boost,?" }               },
         { label = "face",    on = { "behind","co +behind,?" },             off = { "no flank",  "co -behind,?" }              },
     }
     local groupW = math.floor((pw - 20) / 3)
@@ -163,11 +165,15 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
 
         local onBtn  = ns.UI.Button.stone(stratP.content, g.on[1],  64, 20)
         onBtn:SetPoint("TOPLEFT", stratP.content, "TOPLEFT", x, -18)
-        onBtn:SetScript("OnClick", function() send(g.on[2]); ns.MsgInfo(g.on[2]) end)
+        local function setState(v)
+            local db = ns.Persistence.DB
+            if g.dbKey and db then db[g.dbKey] = v end
+        end
+        onBtn:SetScript("OnClick", function() send(g.on[2]); setState(true); ns.MsgInfo(g.on[2]) end)
 
         local offBtn = ns.UI.Button.stone(stratP.content, g.off[1], 64, 20)
         offBtn:SetPoint("TOPLEFT", stratP.content, "TOPLEFT", x + 68, -18)
-        offBtn:SetScript("OnClick", function() send(g.off[2]); ns.MsgInfo(g.off[2]) end)
+        offBtn:SetScript("OnClick", function() send(g.off[2]); setState(false); ns.MsgInfo(g.off[2]) end)
     end
 
     -- ============================================================
@@ -285,7 +291,7 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
     local roleH = 170
     local roleP = ns.UI.Panel.Create(pane, pw, roleH, "Role commands")
     roleP:SetPoint("TOPLEFT", pane, "TOPLEFT", 8, nextY(roleH))
-    addPanelMeta(roleP, "5 x 4 matrix - shift-click to flash")
+    addPanelMeta(roleP, "5 x 4 matrix")
 
     -- Matrix layout: 64px label + 4 equal-width glyph cells
     local labelW   = 64

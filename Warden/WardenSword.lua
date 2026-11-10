@@ -60,8 +60,9 @@ end
 local function fireAction(key, btn)
     local fn = ns.WardenSword.Actions and ns.WardenSword.Actions[key]
     if not fn then return end
-    fn()
+    local result = fn()  -- toggles (aoe / burn / bl) return their new state
     if btn then pulseBtn(btn) end
+    return result
 end
 
 -- ----------------------------------------------------------
@@ -417,10 +418,12 @@ local function build()
     frame:RegisterEvent("PLAYER_REGEN_DISABLED")
     frame:SetScript("OnEvent", function(self, event)
         local s = sw(); if not s then return end
+        -- Opt-in pop-up when combat starts. (The old `not s.hidden` guard made
+        -- this a no-op: s.hidden is only false while the HUD is already shown.)
         if event == "PLAYER_REGEN_DISABLED"
-           and s.autoShowCombat and not s.hidden then
+           and s.autoShowCombat and not self:IsShown() then
             if ns.Debug then ns.Debug("sword", "auto-show on combat start") end
-            self:Show()
+            ns.WardenSword.Show()
         end
     end)
 
@@ -599,6 +602,20 @@ BINDING_HEADER_WARDENSWORDACTIONS     = "WardenSword - Actions"
 BINDING_HEADER_WARDENSWORDROLES       = "WardenSword - Role commands"
 
 BINDING_NAME_WARDEN_TOGGLE            = "Toggle Warden window"
+BINDING_NAME_WARDEN_TAB_SPEC          = "Open Spec tab"
+BINDING_NAME_WARDEN_TAB_CONTROLS      = "Open Controls tab"
+BINDING_NAME_WARDEN_TAB_COMP          = "Open Bot Comp tab"
+BINDING_NAME_WARDEN_TAB_ROSTER        = "Open Roster tab"
+BINDING_NAME_WARDEN_TAB_SETTINGS      = "Open Settings tab"
+BINDING_NAME_WARDEN_TAB_HELP          = "Open Help tab"
+BINDING_NAME_WARDEN_SUMMON            = "Summon all bots (legacy)"
+BINDING_NAME_WARDEN_FOLLOW            = "All: Follow (legacy)"
+BINDING_NAME_WARDEN_STAY              = "All: Stay (legacy)"
+BINDING_NAME_WARDEN_TANK_ATTACK       = "Tanks: Attack (legacy)"
+BINDING_NAME_WARDEN_FLEE              = "All: Flee (legacy)"
+BINDING_NAME_WARDEN_RTSC_ON           = "RTSC: enable point-and-click"
+BINDING_NAME_WARDEN_RTSC_SAVE         = "RTSC: save position 1"
+BINDING_NAME_WARDEN_RTSC_GO           = "RTSC: go to position 1"
 BINDING_NAME_WARDENSWORD_TOGGLE       = "Toggle WardenSword HUD"
 BINDING_NAME_WARDENSWORD_LOCK         = "Lock / unlock WardenSword position"
 BINDING_NAME_WARDENSWORD_SUMMON       = "Summon all bots"
@@ -632,7 +649,9 @@ ns.Persistence.OnReady(function()
     local s = sw()
     build()
     if s then
-        if s.startLocked and not s.locked then s.locked = true end
+        -- SetLocked (not a bare assignment) so the header lock glyph, drawn by
+        -- build() before this runs, is refreshed to match.
+        if s.startLocked and not s.locked then ns.WardenSword.SetLocked(true) end
         if s.hidden then frame:Hide() else frame:Show() end
     end
     ns.WardenSword.ApplyAlpha()

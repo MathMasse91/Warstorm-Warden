@@ -66,7 +66,9 @@ function ns.Channel()
     local db = ns.Persistence and ns.Persistence.DB
     local override = db and db.commandChannel
     if override == "RAID" or override == "PARTY" then return override end
-    return (GetNumRaidMembers() > 0) and "RAID" or "PARTY"
+    if GetNumRaidMembers() > 0 then return "RAID" end
+    if GetNumPartyMembers() > 0 then return "PARTY" end
+    return "SAY"  -- solo: PARTY would only raise "You aren't in a party"
 end
 
 -- Broadcast one chat message to the current RAID/PARTY (or SAY when solo).
@@ -495,6 +497,9 @@ function ns.UI.Banner.Create(parent, variant)
         bgFile   = "Interface\\Buttons\\WHITE8x8",
         edgeFile = nil,
     })
+    -- A backdrop with no color renders opaque white; keep the base clear so
+    -- only the translucent gradient layers below tint the strip.
+    f:SetBackdropColor(0, 0, 0, 0)
 
     -- Two-layer gradient simulation since 3.3.5 lacks SetGradient.
     local top = f:CreateTexture(nil, "BACKGROUND")

@@ -209,6 +209,11 @@ local CLASS_ICON = ns.Data.CLASS_ICON
 -- ----------------------------------------------------------
 -- Selected count refresh (called from checkbox clicks)
 -- ----------------------------------------------------------
+-- Selection is keyed by GUID, not by pooled row widget: rows are reused
+-- across rebuilds, so a checkbox state left on a row would otherwise
+-- "move" to whoever lands in that row after a roster/filter change.
+local selectedGUIDs = {}
+
 local function refreshSelectedCount()
     selectedCount = 0
     for _, r in ipairs(rows) do
@@ -242,7 +247,13 @@ local function createRowWidget()
     local cb = CreateFrame("CheckButton", rowName .. "Cb", f, "InterfaceOptionsCheckButtonTemplate")
     cb:SetSize(20, 20)
     cb:SetPoint("LEFT", pBtn, "RIGHT", 4, 0)
-    cb:SetScript("OnClick", refreshSelectedCount)
+    cb:SetScript("OnClick", function(self)
+        local row = self:GetParent()._row
+        if row and row.guid then
+            selectedGUIDs[row.guid] = self:GetChecked() and true or nil
+        end
+        refreshSelectedCount()
+    end)
 
     -- Class avatar (20x20 cropped from Classes-Circles atlas)
     local av = f:CreateTexture(nil, "ARTWORK")
@@ -300,13 +311,15 @@ local function createRowWidget()
     local groupDrop = CreateFrame("Frame", rowName .. "GroupDrop", f, "UIDropDownMenuTemplate")
     groupDrop:Hide()
 
-    return {
+    local row = {
         frame = f, cb = cb, av = av, pBtn = pBtn,
         nmTop = nmTop, nmBot = nmBot,
         specDrop = specDrop, chipHolder = chipHolder, chips = {},
         respecBtn = respecBtn,
         groupBtn = groupBtn, groupDrop = groupDrop,
     }
+    f._row = row  -- lets the checkbox find its row's current GUID
+    return row
 end
 
 local function populateSpecDropdown(row)
@@ -325,6 +338,13 @@ local function populateSpecDropdown(row)
                         name = row.name, spec = self.value, classToken = row.classToken,
                         opt1 = prev.opt1, opt2 = prev.opt2,
                     }
+                end
+                -- Same guards as the Re-Spec buttons: never whisper yourself
+                -- or a character flagged as a human player.
+                if not row.name or UnitIsUnit("player", row.name) then return end
+                if ns.Persistence.IsPlayerName(row.name) then
+                    ns.MsgWarn(row.name .. " is flagged as a player - not re-spec'd.")
+                    return
                 end
                 local prev = ns.Engine.state.assignedSpecs[row.guid] or {}
                 whisperSpec(row.name, self.value, row.classToken, prev.opt1, prev.opt2)
@@ -357,7 +377,9 @@ local function rowPassesFilter(role, name)
 end
 
 local function rebuild()
-    if not frame or not frame:IsShown() then return end
+    -- IsVisible: skip while the master window is closed (frame:OnShow, which
+    -- also fires when the window reopens, rebuilds it).
+    if not frame or not frame:IsVisible() then return end
 
     local units = iterRaidUnits()
     if ns.DebugF then
@@ -402,6 +424,7 @@ local function rebuild()
 
             row._visible = rowPassesFilter(row.role, row.name)
             if row._visible then table.insert(groups[row.role], row) end
+            row.cb:SetChecked(row.guid and selectedGUIDs[row.guid] or false)
         else
             row._visible = false
         end
@@ -727,7 +750,11 @@ function ns.UI.Tabs.Roster.BuildInto(pane)
         -- FEATURE-02: skip rows flagged as human players.
         local n, skipped = 0, 0
         for _, r in ipairs(rows) do
+            -- Tracked = has a GUID assignment from a Build / Re-Spec. Untracked
+            -- rows only show a guessed fallback spec, which could flip a
+            -- healer or tank to DPS, so they're left alone.
             if r.frame:IsShown() and r.name and r.spec and r.guid
+               and ns.Engine.state.assignedSpecs[r.guid]
                and not UnitIsUnit("player", r.name) then
                 if ns.Persistence.IsPlayerName(r.name) then
                     skipped = skipped + 1
