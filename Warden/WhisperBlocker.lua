@@ -43,6 +43,8 @@ ns.WhisperBlocker = ns.WhisperBlocker or {}
 --   "Equipping <item link>"                         (bot gear swaps)
 --   "Staying"                                        (bot stay ack)
 --   "Following"                                      (bot follow ack)
+--   "Using <item link> (<N> available) on self"     (bot item use)
+--   "Picking <spec>"    e.g. "Picking holy pve"      (bot talent-spec ack)
 --
 -- Notes on the trickier two:
 --   * askinvite: the player name and him/her pronoun change every time, so we
@@ -54,6 +56,12 @@ ns.WhisperBlocker = ns.WhisperBlocker or {}
 --   * staying / following: these words appear inside plenty of normal
 --     sentences, so each is a WHOLE-MESSAGE match only ("^...$", trailing
 --     punctuation ok), never a substring.
+--   * usingitem: like equipping, anchored on the real item hyperlink
+--     "|hitem" plus the "available" count, so plain chat is never caught.
+--     Target-agnostic (covers "on self" and "on <player>" alike).
+--   * picking: the spec name varies (holy pve, da blood pve, ...), but every
+--     WarStorm spec ends in "pve"/"pvp". So it's a WHOLE-MESSAGE match that
+--     starts with "picking " and ends with "pv[ep]", sparing "picking up ...".
 -- ----------------------------------------------------------
 local BOT_WHISPER_PATTERNS = {
     { key = "invite",    label = "\"Invite me to your group first\"",
@@ -68,6 +76,10 @@ local BOT_WHISPER_PATTERNS = {
       pattern = "^%s*staying[%s%p]*$", anySender = true },
     { key = "following", label = "\"Following\"  (whole message only)",
       pattern = "^%s*following[%s%p]*$", anySender = true },
+    { key = "usingitem", label = "\"Using [item] (N available) on self\"  (your bots' item use)",
+      pattern = "using.-|hitem.-available", anySender = true },
+    { key = "picking",   label = "\"Picking <spec>\"  (your bots' talent spec)",
+      pattern = "^%s*picking .- pv[ep][%s%p]*$", anySender = true },
 }
 
 -- Exposed so UI_TabSettings can build one checkbox per line without
