@@ -248,7 +248,7 @@ local function buildFrame()
 
     local statsLbl = footer:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     statsLbl:SetPoint("LEFT", targetLbl, "RIGHT", 18, 0)
-    statsLbl:SetText("q 0  tracked 0  BL OFF")
+    statsLbl:SetText("q 0 \194\183 tracked 0")  -- same shape as refreshFooter; BL has its own pill
 
     local hintLbl = footer:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hintLbl:SetPoint("RIGHT", footer, "RIGHT", -4, 0)

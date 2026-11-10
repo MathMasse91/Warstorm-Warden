@@ -330,6 +330,27 @@ function ns.UI.Dropdown.style(drop, width)
 end
 
 -- =====================================================================
+-- Thin scrollbar for a UIPanelScrollFrameTemplate scroll frame: hides the
+-- 16px arrow buttons and narrows the track. On 3.3.5a the arrows are NOT
+-- fields on the bar (sb.ScrollUpButton is nil); they only exist as globals
+-- named <scrollName>ScrollBarScrollUp/DownButton, so look them up by name.
+-- =====================================================================
+function ns.UI.ThinScrollbar(sf, width)
+    local name = sf and sf:GetName()
+    local sb = name and _G[name .. "ScrollBar"]
+    if not sb then return end
+    local up   = sb.ScrollUpButton   or _G[name .. "ScrollBarScrollUpButton"]
+    local down = sb.ScrollDownButton or _G[name .. "ScrollBarScrollDownButton"]
+    if up   then up:Hide()   end
+    if down then down:Hide() end
+    sb:ClearAllPoints()
+    sb:SetPoint("TOPLEFT",    sf, "TOPRIGHT",    2, 0)
+    sb:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 2, 0)
+    sb:SetWidth(width or 8)
+    return sb
+end
+
+-- =====================================================================
 -- Tooltip attach helper. Collapses the 7+ hand-rolled copies of
 -- OnEnter=>SetOwner+SetText+AddLine+Show / OnLeave=>Hide across tabs.
 -- =====================================================================
@@ -752,6 +773,7 @@ function ns.UI.HudChrome.BuildHeader(parent, opts)
     cfs:SetText("x")
     cfs:SetTextColor(0.85, 0.18, 0.12, 1)
     close:SetScript("OnClick", opts.onClose)
+    ns.UI.Tooltip.Attach(close, "Close", opts.hint and ("Hide this HUD (reopen with " .. opts.hint .. ").") or nil, "ANCHOR_TOP")
 
     -- Lock toggle just left of close (open/closed glyph, painted by SetLockGlyph).
     local lock = CreateFrame("Button", nil, h)
@@ -761,6 +783,8 @@ function ns.UI.HudChrome.BuildHeader(parent, opts)
     lfs:SetPoint("CENTER", lock, "CENTER", 0, 0)
     lock.fs = lfs
     lock:SetScript("OnClick", opts.onLock)
+    ns.UI.Tooltip.Attach(lock, "Lock / unlock position",
+        "o = movable (drag the header), * = locked in place.", "ANCHOR_TOP")
     h.lockBtn = lock
 
     -- Divider line under the header.
@@ -856,20 +880,36 @@ StaticPopupDialogs["WARDEN_CONFIRM_CLEANUP"] = {
     button1      = YES, button2 = NO, timeout = 0,
     whileDead    = true, hideOnEscape = true,
     OnAccept     = function()
-        SendChatMessage(".warstormbot bot remove *", "SAY")
+        local db = ns.Persistence.DB
+        ns.Engine.SendNow(".warstormbot bot remove *", (db and db.commandChannel) or "SAY")
         ns.MsgWarn("Cleanup: removed all bots.")
     end,
 }
 
 StaticPopupDialogs["WARDEN_CONFIRM_HARD_RESPEC"] = {
-    text         = "HARD ReSpec all bots to default epic?\n(sends .warstormbot bot init=epic)",
+    text         = "HARD ReSpec all bots at %s gear?\n(sends .warstormbot bot init=%s - re-rolls gear AND talents)",
     button1      = YES, button2 = NO, timeout = 0,
     whileDead    = true, hideOnEscape = true,
     OnAccept     = function()
-        SendChatMessage(".warstormbot bot init=epic", "SAY")
-        ns.MsgWarn("Hard ReSpec: sent `.warstormbot bot init=epic`.")
+        -- Uses the shared saved rarity (was hardcoded epic).
+        local rarity = ns.Persistence.GetInitRarity()
+        local db     = ns.Persistence.DB
+        ns.Engine.SendNow(".warstormbot bot init=" .. rarity, (db and db.commandChannel) or "SAY")
+        ns.MsgWarn("Hard ReSpec: sent `.warstormbot bot init=" .. rarity .. "`.")
     end,
 }
+
+-- Generic yes/no confirm: ns.UI.Confirm("Really?", function() ... end).
+-- The text is shown as-is; onYes runs only on accept.
+StaticPopupDialogs["WARDEN_CONFIRM"] = {
+    text         = "%s",
+    button1      = YES, button2 = NO, timeout = 0,
+    whileDead    = true, hideOnEscape = true,
+    OnAccept     = function(_, data) if type(data) == "function" then data() end end,
+}
+function ns.UI.Confirm(text, onYes)
+    StaticPopup_Show("WARDEN_CONFIRM", text, nil, onYes)
+end
 
 -- ----------------------------------------------------------
 -- Load banner

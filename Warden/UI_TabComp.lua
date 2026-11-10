@@ -1155,7 +1155,7 @@ local function buildSlotDetail(parent)
     -- Move / Duplicate / Remove / [P] row. Widths tuned to total 212px (44 +
     -- 4 + 60 + 4 + 48 + 4 + 48) so the [P] button is not clipped by the side
     -- panel ScrollFrame's right edge (scroll child is ~224 wide).
-    d.moveBtn = ns.UI.Button.stone(parent, "move", 44, 20)
+    d.moveBtn = ns.UI.Button.stone(parent, "Move", 44, 20)
     d.moveBtn:SetPoint("TOPLEFT", d.opt2Drop, "BOTTOMLEFT", 16, -8)
     d.moveBtn:SetScript("OnClick", function()
         if not state.selected or not state.slots[state.selected] then return end
@@ -1173,7 +1173,7 @@ local function buildSlotDetail(parent)
         refreshAll()
     end)
 
-    d.dupBtn = ns.UI.Button.stone(parent, "duplicate", 60, 20)
+    d.dupBtn = ns.UI.Button.stone(parent, "Duplicate", 60, 20)
     d.dupBtn:SetPoint("LEFT", d.moveBtn, "RIGHT", 4, 0)  -- 44+4+60 = 108
     d.dupBtn:SetScript("OnClick", function()
         if not state.selected or not state.slots[state.selected] then return end
@@ -1191,7 +1191,7 @@ local function buildSlotDetail(parent)
         refreshAll()
     end)
 
-    d.removeBtn = ns.UI.Button.warn(parent, "remove", 48, 20)
+    d.removeBtn = ns.UI.Button.warn(parent, "Remove", 48, 20)
     d.removeBtn:SetPoint("LEFT", d.dupBtn, "RIGHT", 4, 0)  -- 108+4+48 = 160
     d.removeBtn:SetScript("OnClick", function()
         if state.selected then
@@ -1956,15 +1956,15 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     fileHeader:SetText("FILE")
     fileHeader:SetTextColor(0.72, 0.58, 0.21, 1)
 
-    local saveBtn   = ns.UI.Button.stone(fileHost, "save",    FILE_BTN_W, FILE_BTN_H)
-    local loadBtn   = ns.UI.Button.stone(fileHost, "load",    FILE_BTN_W, FILE_BTN_H)
-    local importBtn = ns.UI.Button.stone(fileHost, "import",  FILE_BTN_W, FILE_BTN_H)
-    local exportBtn = ns.UI.Button.stone(fileHost, "export",  FILE_BTN_W, FILE_BTN_H)
-    local deleteBtn = ns.UI.Button.warn (fileHost, "delete",  FILE_BTN_W, FILE_BTN_H)
-    local clearBtn  = ns.UI.Button.stone(fileHost, "clear",   FILE_BTN_W, FILE_BTN_H)
-    local cleanBtn  = ns.UI.Button.warn (fileHost, "cleanup", FILE_BTN_W, FILE_BTN_H,
+    local saveBtn   = ns.UI.Button.stone(fileHost, "Save",    FILE_BTN_W, FILE_BTN_H)
+    local loadBtn   = ns.UI.Button.stone(fileHost, "Load",    FILE_BTN_W, FILE_BTN_H)
+    local importBtn = ns.UI.Button.stone(fileHost, "Import",  FILE_BTN_W, FILE_BTN_H)
+    local exportBtn = ns.UI.Button.stone(fileHost, "Export",  FILE_BTN_W, FILE_BTN_H)
+    local deleteBtn = ns.UI.Button.warn (fileHost, "Delete",  FILE_BTN_W, FILE_BTN_H)
+    local clearBtn  = ns.UI.Button.stone(fileHost, "Clear",   FILE_BTN_W, FILE_BTN_H)
+    local cleanBtn  = ns.UI.Button.warn (fileHost, "Cleanup", FILE_BTN_W, FILE_BTN_H,
                                          "WARDEN_CONFIRM_CLEANUP")
-    local resyncBtn = ns.UI.Button.stone(fileHost, "resync",  FILE_BTN_W, FILE_BTN_H)
+    local resyncBtn = ns.UI.Button.stone(fileHost, "Resync",  FILE_BTN_W, FILE_BTN_H)
 
     saveBtn  :SetPoint("LEFT", fileHeader, "RIGHT", 8, 0)
     loadBtn  :SetPoint("LEFT", saveBtn,    "RIGHT", FILE_BTN_GAP, 0)
@@ -1980,7 +1980,7 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
 
     -- Rename a saved comp. Occupies the 8th cell (same anchor as the hidden
     -- resync button) so no layout math changes.
-    local renameBtn = ns.UI.Button.stone(fileHost, "rename", FILE_BTN_W, FILE_BTN_H)
+    local renameBtn = ns.UI.Button.stone(fileHost, "Rename", FILE_BTN_W, FILE_BTN_H)
     renameBtn:SetPoint("LEFT", cleanBtn, "RIGHT", FILE_BTN_GAP, 0)
 
     -- Resync: rearrange the LIVE raid so each member's subgroup matches
@@ -2096,10 +2096,7 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     fileTip(resyncBtn, "Resync raid layout to comp",
         "Push the LIVE raid's subgroups to match this comp. Each filled slot is FIFO-matched to a raid member of the same class; mismatched members get SetRaidSubgroup'd into the slot's column. The [P] slot moves you specifically. Requires raid leader or officer.")
 
-    saveBtn:SetScript("OnClick", function()
-        local name = Trim(state.nameBox:GetText())
-        if ns.DebugF then ns.DebugF("comp", "save clicked: name=%q", tostring(name)) end
-        if name == "" then ns.MsgErr("Enter a comp name first."); return end
+    local function saveComp(name)
         local db = ns.Persistence.DB
         if not db then return end
         -- FEATURE-03: save BOTH the legacy `rows` (count-based) AND the
@@ -2128,6 +2125,17 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
         refreshPresetDropdown()
         ns.MsgInfo(string.format("Saved comp: %s (%d slot(s), size %d).",
             name, filled, state.size))
+    end
+    saveBtn:SetScript("OnClick", function()
+        local name = Trim(state.nameBox:GetText())
+        if ns.DebugF then ns.DebugF("comp", "save clicked: name=%q", tostring(name)) end
+        if name == "" then ns.MsgErr("Enter a comp name first."); return end
+        local db = ns.Persistence.DB
+        if db and db.comps and db.comps[name] then
+            ns.UI.Confirm("Overwrite the saved comp \"" .. name .. "\"?", function() saveComp(name) end)
+        else
+            saveComp(name)
+        end
     end)
 
     loadBtn:SetScript("OnClick", function()
@@ -2149,9 +2157,16 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     clearBtn:SetScript("OnClick", function()
         -- Local only (as the tooltip says): GUID tracking used by Roster /
         -- Re-Spec is NOT wiped here - Settings > Maintenance does that.
-        wipe(state.slots)
-        state.selected = nil
-        refreshAll()
+        local function doClear()
+            wipe(state.slots)
+            state.selected = nil
+            refreshAll()
+        end
+        if compHasSlots() then
+            ns.UI.Confirm("Clear every slot in the grid?\n(saved comps are not touched)", doClear)
+        else
+            doClear()
+        end
     end)
 
     deleteBtn:SetScript("OnClick", function()

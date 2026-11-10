@@ -224,6 +224,10 @@ local function refreshSelectedCount()
     if frame and frame.selCountLbl then
         frame.selCountLbl:SetText(selectedCount .. " selected")
     end
+    -- Nothing selected -> nothing to re-spec.
+    if frame and frame.respecSelBtn then
+        if selectedCount > 0 then frame.respecSelBtn:Enable() else frame.respecSelBtn:Disable() end
+    end
 end
 
 -- ----------------------------------------------------------
@@ -300,6 +304,10 @@ local function createRowWidget()
     -- PATCH_NOTES §12a: full "Re-Spec" label on the row button, 58x18.
     local respecBtn = ns.UI.Button.stone(f, "Re-Spec", 58, 18)
     respecBtn:SetPoint("RIGHT", f, "RIGHT", -4, 0)
+    ns.UI.Tooltip.Attach(respecBtn, "Re-Spec",
+        "Whispers this member's spec (shown in the dropdown) plus its strategies again.", "ANCHOR_TOP")
+    ns.UI.Tooltip.Attach(pBtn, "Player flag [P]",
+        "Marks this name as a real player: Warden never specs, re-specs or whispers it. Click to toggle.", "ANCHOR_TOP")
 
     -- Per-row subgroup control (FEATURE: live raid reorder). Stone button
     -- showing "G<n>"; click opens a dropdown with G1..G8 that fires
@@ -308,6 +316,8 @@ local function createRowWidget()
     -- leader / assistant rights.
     local groupBtn = ns.UI.Button.stone(f, "G-", 30, 18)
     groupBtn:SetPoint("RIGHT", respecBtn, "LEFT", -4, 0)
+    ns.UI.Tooltip.Attach(groupBtn, "Raid subgroup",
+        "Shows this member's group (G1-G8). Click to move them - needs raid leader or assistant.", "ANCHOR_TOP")
     local groupDrop = CreateFrame("Frame", rowName .. "GroupDrop", f, "UIDropDownMenuTemplate")
     groupDrop:Hide()
 
@@ -771,6 +781,8 @@ function ns.UI.Tabs.Roster.BuildInto(pane)
 
     local respecSelBtn = ns.UI.Button.stone(frame, "Re-Spec Selected", 140, 22)
     respecSelBtn:SetPoint("LEFT", respecAllBtn, "RIGHT", 8, 0)
+    frame.respecSelBtn = respecSelBtn
+    respecSelBtn:Disable()
     respecSelBtn:SetScript("OnClick", function()
         if ns.Debug then ns.Debug("respec", "Re-Spec Selected clicked") end
         local n, skipped = 0, 0

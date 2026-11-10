@@ -30,15 +30,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     scroll:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -24, 32)
 
     -- Thin scrollbar treatment matching Help tab (§6.9 there).
-    local sb = _G["WardenSettingsScrollScrollBar"]
-    if sb then
-        if sb.ScrollUpButton   then sb.ScrollUpButton:Hide()   end
-        if sb.ScrollDownButton then sb.ScrollDownButton:Hide() end
-        sb:ClearAllPoints()
-        sb:SetPoint("TOPLEFT",    scroll, "TOPRIGHT", 2, 0)
-        sb:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 2, 0)
-        sb:SetWidth(8)
-    end
+    ns.UI.ThinScrollbar(scroll, 8)
 
     local content = CreateFrame("Frame", "WardenSettingsContent", scroll)
     local contentW = paneW - 32
@@ -335,23 +327,31 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     local resetTracking = ns.UI.Button.stone(maintP.content, "Clear GUID tracking", 180, 22)
     resetTracking:SetPoint("TOPLEFT", maintP.content, "TOPLEFT", 190, -4)
     resetTracking:SetScript("OnClick", function()
-        if ns.Engine and ns.Engine.ClearTracking then
-            ns.Engine.ClearTracking()
-            ns.MsgInfo("GUID tracking cleared. Re-Spec will now fall back to FIFO.")
-        end
+        ns.UI.Confirm("Clear GUID tracking?\nRe-Spec forgets which spec each bot was given.", function()
+            if ns.Engine and ns.Engine.ClearTracking then
+                ns.Engine.ClearTracking()
+                ns.MsgInfo("GUID tracking cleared. Re-Spec will now fall back to FIFO.")
+            end
+        end)
     end)
+    ns.UI.Tooltip.Attach(resetTracking, "Clear GUID tracking",
+        "Forgets the spec Warden assigned to each bot (used by Re-Spec and Roster). Asks first.", "ANCHOR_TOP")
 
     -- Clear player flags: wipes the [P] table except your own character.
     -- Useful when the list has grown stale from recruits that have left.
     local clearFlags = ns.UI.Button.stone(maintP.content, "Clear player flags", 180, 22)
     clearFlags:SetPoint("TOPLEFT", maintP.content, "TOPLEFT", 4, -32)
     clearFlags:SetScript("OnClick", function()
-        if ns.Persistence and ns.Persistence.ClearAllPlayerFlags then
-            local n = ns.Persistence.ClearAllPlayerFlags()
-            ns.MsgInfo(string.format(
-                "Cleared %d player flag(s). Your own character is still protected.", n))
-        end
+        ns.UI.Confirm("Clear every [P] player flag?\nYour own character stays protected.", function()
+            if ns.Persistence and ns.Persistence.ClearAllPlayerFlags then
+                local n = ns.Persistence.ClearAllPlayerFlags()
+                ns.MsgInfo(string.format(
+                    "Cleared %d player flag(s). Your own character is still protected.", n))
+            end
+        end)
     end)
+    ns.UI.Tooltip.Attach(clearFlags, "Clear player flags",
+        "Removes every [P] (real player) flag except your own, so those names can be spec'd and whispered again. Asks first.", "ANCHOR_TOP")
 
     -- Re-seed any default raid presets that have been deleted. Never
     -- overwrites existing entries, so user edits are preserved.

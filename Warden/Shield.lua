@@ -438,7 +438,7 @@ local function clickExclusion(item, idx)
     if state.exclusionsBtn then
         local lbl = state.exclusionsBtn:GetFontString()
         local s = shieldDB(); local n = (s and s.exclusions) and #s.exclusions or 0
-        if lbl then lbl:SetText("exclusions \194\183 " .. n) end
+        if lbl then lbl:SetText("Exclusions \194\183 " .. n) end
     end
     refreshList()
 end
@@ -534,7 +534,7 @@ clickLine = function(idx)
         local n = (s and s.exclusions) and #s.exclusions or 0
         if state.exclusionsBtn then
             local lbl = state.exclusionsBtn:GetFontString()
-            if lbl then lbl:SetText("exclusions \194\183 " .. n) end
+            if lbl then lbl:SetText("Exclusions \194\183 " .. n) end
         end
         refreshList()
     end
@@ -763,7 +763,7 @@ refreshList = function()
         local lbl = state.exclusionsBtn:GetFontString()
         local s = shieldDB()
         local n = (s and s.exclusions) and #s.exclusions or 0
-        if lbl then lbl:SetText("exclusions \194\183 " .. n) end
+        if lbl then lbl:SetText("Exclusions \194\183 " .. n) end
     end
 
     -- Conditional filter row visibility — only show when we have enough
@@ -1110,7 +1110,7 @@ local function build()
     tsub:SetTextColor(0.45, 0.40, 0.32, 1)
     state.targetSub = tsub
 
-    local pick = ns.UI.Button.stone(targetRow, "pick", 48, 18)
+    local pick = ns.UI.Button.stone(targetRow, "Pick", 48, 18)
     pick:SetPoint("RIGHT", targetRow, "RIGHT", -PAD, 0)
     pick:SetScript("OnClick", function()
         local n, c = snapshotTarget()
@@ -1155,7 +1155,7 @@ local function build()
         "Whisper `spells` to the targeted bot to list its spells. Captures the bot's reply for ~5s; click any line to send `cast <spell>`.",
         "ANCHOR_TOP")
 
-    local clear = ns.UI.Button.stone(actRow, "clear", 56, ACTION_H)
+    local clear = ns.UI.Button.stone(actRow, "Clear", 56, ACTION_H)
     clear:SetPoint("RIGHT", actRow, "RIGHT", -PAD, 0)
     clear:SetScript("OnClick", function() ns.Shield.Clear() end)
     state.clearBtn = clear
@@ -1293,7 +1293,7 @@ local function build()
     footerRow:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  0, PAD)
     footerRow:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, PAD)
 
-    local hideGray = ns.UI.Button.stone(footerRow, "hide gray", 64, FOOTER_H)
+    local hideGray = ns.UI.Button.stone(footerRow, "Hide Gray", 64, FOOTER_H)
     hideGray:SetPoint("LEFT", footerRow, "LEFT", PAD, 0)
     hideGray:SetScript("OnClick", function()
         state.hideGray = not state.hideGray
@@ -1313,7 +1313,7 @@ local function build()
         "Filter out spells whose rank suffix is gray (the bot can't currently use them - level/talent gated). Bypassed in ban / unban modes.",
         "ANCHOR_TOP")
 
-    local viewExcl = ns.UI.Button.stone(footerRow, "exclusions \194\183 0", 100, FOOTER_H)
+    local viewExcl = ns.UI.Button.stone(footerRow, "Exclusions \194\183 0", 100, FOOTER_H)
     viewExcl:SetPoint("LEFT", hideGray, "RIGHT", 4, 0)
     viewExcl:SetScript("OnClick", function()
         state.viewExclusions = not state.viewExclusions
@@ -1333,18 +1333,21 @@ local function build()
         "Toggle the scroll list between captured whispers and the persisted exclusions list. Click an exclusion row to whisper `ss -<id>` and remove it.",
         "ANCHOR_TOP")
 
-    local resetAll = ns.UI.Button.warn(footerRow, "reset all", 64, FOOTER_H)
+    local resetAll = ns.UI.Button.warn(footerRow, "Reset All", 64, FOOTER_H)
     resetAll:SetPoint("RIGHT", footerRow, "RIGHT", -PAD, 0)
     resetAll:SetScript("OnClick", function()
         if not state.target or state.target == "" then
             ns.MsgWarn("No target locked - click [pick] first.")
             return
         end
-        SendChatMessage("ss reset", "WHISPER", nil, state.target)
-        local s = shieldDB()
-        if s then s.exclusions = {} end
-        ns.MsgInfo("Sent `ss reset` to " .. state.target .. ". Local exclusions wiped.")
-        refreshList()
+        local target = state.target
+        ns.UI.Confirm("Reset ALL excluded spells on " .. target .. "?\n(whispers `ss reset`)", function()
+            ns.Engine.WhisperNow(target, "ss reset")
+            local s = shieldDB()
+            if s then s.exclusions = {} end
+            ns.MsgInfo("Sent `ss reset` to " .. target .. ". Local exclusions wiped.")
+            refreshList()
+        end)
     end)
     ns.UI.Tooltip.Attach(resetAll, "Reset all exclusions",
         "Whisper `ss reset` to the locked bot, clearing its exclude-spells list. Also wipes our local mirror in WardenDB.shield.exclusions.",

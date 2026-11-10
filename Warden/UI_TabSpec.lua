@@ -546,7 +546,7 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     -- SecureActionButton whose macrotext is pre-assigned to `/target <name>`
     -- out of combat; clicking fires the protected call through the secure
     -- path (no taint).
-    local histBtn = ns.UI.Button.stone(cardPanel, "history v", 78, 20)
+    local histBtn = ns.UI.Button.stone(cardPanel, "History", 78, 20)
     histBtn:SetPoint("LEFT", prevBtn, "RIGHT", 4, 0)
     tabState.histBtn = histBtn
 
@@ -696,7 +696,7 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
         UIDropDownMenu_SetText(self, ns.Data.RarityText(ns.Persistence.GetInitRarity()))
     end)
 
-    local levelBtn = ns.UI.Button.gold(cardPanel.content, "level up", 90, 20)
+    local levelBtn = ns.UI.Button.gold(cardPanel.content, "Re-gear Bots", 90, 20)
     levelBtn:SetPoint("TOPRIGHT", rarityDrop, "BOTTOMRIGHT", -16, 0)
     levelBtn:SetScript("OnClick", function()
         local db     = ns.Persistence and ns.Persistence.DB
@@ -705,6 +705,16 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
         ns.Engine.SendNow(".warstormbot bot init=" .. rarity, chan)
         ns.MsgInfo(string.format("Sent `.warstormbot bot init=%s` (%s).", rarity, chan))
     end)
+
+    -- U9 tooltips for the action row + bot-init control.
+    local tip = ns.UI.Tooltip.Attach
+    tip(prevBtn, "Previous target", "Re-targets your last target (/targetlasttarget). Works in combat.", "ANCHOR_TOP")
+    tip(histBtn, "Target history", "Your last 6 player targets; click one to re-target it.", "ANCHOR_TOP")
+    tip(autogearBtn, "Autogear", "Broadcasts `autogear` to your group: every bot equips its best gear.", "ANCHOR_TOP")
+    tip(buffsBtn, "World Buffs", "Broadcasts `nc +worldbuff` to your group.", "ANCHOR_TOP")
+    tip(levelBtn, "Re-gear bots",
+        "Sends `.warstormbot bot init=<rarity>` (rarity from the dropdown, remembered): re-rolls every bot's gear AND talents - re-spec afterwards.",
+        "ANCHOR_TOP")
 
     -- ============================================================
     -- Specs grid panel

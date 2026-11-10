@@ -200,7 +200,7 @@ end
 local function buildBloodlust(parent)
     local g = CreateFrame("Frame", nil, parent)
     -- Stone variant so we can recolor in RefreshBLButton to reflect state.
-    local b = ns.UI.Button.stone(g, "BLOODLUST", 200, 22)
+    local b = ns.UI.Button.stone(g, "Bloodlust", 200, 22)
     tagRim(b, ns.Tokens.red_btn)
     b:SetScript("OnClick", function(self)
         fireAction("bl", self)
@@ -211,7 +211,7 @@ local function buildBloodlust(parent)
     return g
 end
 
--- Repaint the BLOODLUST button so it advertises the current db.bloodlust
+-- Repaint the Bloodlust button so it advertises the current db.bloodlust
 -- state. Called by the 0.5s status ticker and by the BL button OnClick.
 function ns.WardenSword.RefreshBLButton()
     local b = bodyWidgets.bloodlustBtn
@@ -223,14 +223,14 @@ function ns.WardenSword.RefreshBLButton()
         b:SetBackdropColor(0.48, 0.10, 0.07, 1)              -- red fill
         b:SetBackdropBorderColor(0.72, 0.20, 0.12, 1)        -- red rim
         if fs then fs:SetTextColor(1.00, 0.92, 0.75, 1) end  -- warm white
-        b:SetText("BLOODLUST \194\183 ON")
+        b:SetText("Bloodlust \194\183 ON")
     else
         local STONE = ns.Tokens.stone_tile
         local RIM   = ns.Tokens.stone_rim
         b:SetBackdropColor(STONE[1], STONE[2], STONE[3], 1)
         b:SetBackdropBorderColor(RIM[1], RIM[2], RIM[3], 1)
         if fs then fs:SetTextColor(0.55, 0.50, 0.42, 1) end  -- gold_dim
-        b:SetText("BLOODLUST")
+        b:SetText("Bloodlust")
     end
 end
 

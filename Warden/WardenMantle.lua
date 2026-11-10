@@ -288,14 +288,19 @@ local function buildBody()
         ns.MsgInfo(string.format("Whispered `summon` -> %s.", ns.ColorClass(class, name)))
     end)
     frame.summonBtn = summonBtn
+    ns.UI.Tooltip.Attach(summonBtn, "Summon target",
+        "Whispers `summon` to the targeted bot only (Controls > Summon calls every bot).", "ANCHOR_TOP")
 
-    local ag = ns.UI.Button.gold(frame, "Autogear", 60, 18)
+    -- Stone like Summon: equal-weight siblings (gold read as a toggled-on state).
+    local ag = ns.UI.Button.stone(frame, "Autogear", 60, 18)
     ag:SetScript("OnClick", function()
         -- Group channel (RAID in a raid): PARTY only reached your subgroup.
         local chan = ns.Channel()
         ns.Engine.SendNow("autogear", chan)
         ns.MsgInfo("Sent `autogear` -> " .. chan .. ".")
     end)
+    ns.UI.Tooltip.Attach(ag, "Autogear",
+        "Sends `autogear` to your group: every bot equips its best gear.", "ANCHOR_TOP")
     frame.autogear = ag
 
     -- Bot-gear re-roll: rarity dropdown + compact RB button. RB re-rolls bot
@@ -334,8 +339,8 @@ local function buildBody()
         ns.Engine.SendNow(".warstormbot bot init=" .. rarity, chan)
         ns.MsgInfo(string.format("Sent `.warstormbot bot init=%s` (%s).", rarity, chan))
     end)
-    ns.UI.Tooltip.Attach(resetBtn, "Reset Bot gear",
-        "Re-rolls the targeted / all bots' gear at the selected rarity (.warstormbot bot init).",
+    ns.UI.Tooltip.Attach(resetBtn, "Re-gear bots",
+        "Sends `.warstormbot bot init=<rarity>` (rarity from the dropdown, remembered): re-rolls the targeted / all bots' gear AND talents - click a spec tile afterwards.",
         "ANCHOR_TOP")
     frame.resetBtn = resetBtn
 end

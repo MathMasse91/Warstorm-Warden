@@ -17,7 +17,7 @@ local READER_PAD_SIDE   = 28
 local READER_PAD_BOT    = 18
 local CHAP_H            = 22
 local GROUP_H           = 26
-local SCROLLBAR_W       = 4
+local SCROLLBAR_W       = 8  -- matches Settings / Shield; 4px was hard to grab
 local SCROLLBAR_PAD     = 8
 local DEFAULT_CHAPTER   = "intro"
 
@@ -102,7 +102,7 @@ local CHAPTERS = {
             { kind = "h2",   text = "Chip tray" },
             { kind = "p",    text = "Ten class chips along the side. |kbd[Click]| adds one to the next empty slot. |kbd[Shift-click]| prompts for N copies. |kbd[Drag]| a chip onto a slot to drop it there (overwrites the existing slot)." },
             { kind = "h2",   text = "Slot detail" },
-            { kind = "p",    text = "CLASS / SPEC / BLESSING-TOTEM / AURA-RESIST dropdowns set the whispered talent + |ck[nc +X]| strategies. |kbd[move]| shifts to the next empty slot. |kbd[duplicate]| copies the slot. |kbd[remove]| clears it. |kbd[P]| toggles the human-player flag." },
+            { kind = "p",    text = "CLASS / SPEC / BLESSING-TOTEM / AURA-RESIST dropdowns set the whispered talent + |ck[nc +X]| strategies. |kbd[Move]| shifts to the next empty slot. |kbd[Duplicate]| copies the slot. |kbd[Remove]| clears it. |kbd[P]| toggles the human-player flag." },
             { kind = "h2",   text = "Player slots and [P]" },
             { kind = "p",    text = "Any slot flagged |kbd[P]| is never summoned, re-spec'd, or modified by automated systems. At Build time, if the comp has a |kbd[P]| slot and you have raid assistant/leader rights, Warden calls |ck[SetRaidSubgroup]| to move you into that slot's group before spawning bots \226\128\148 fixes the 'caster group drifts to G2 because the player is stuck in G1' problem." },
             { kind = "h2",   text = "Coverage" },
@@ -114,11 +114,11 @@ local CHAPTERS = {
             { kind = "h2",   text = "To Chat" },
             { kind = "p",    text = "Under the filled counter. Pick a channel (Raid, Party, Guild, Officer, Say, Yell, Battleground) and Warden posts the grid as readable text, e.g. |ck[Warden Comp [ICC] (24/25): Priest: 2 Disc | ...]|. Your |kbd[P]| slot is left out; long comps split between classes. Idea by Feryll/Huntriss [DGEN]." },
             { kind = "h2",   text = "Save, load, delete" },
-            { kind = "p",    text = "|kbd[save]| stores the current comp (name + size + slot positions + isPlayer flags). |kbd[load]| restores it by name. |kbd[delete]| removes the comp named in the COMP box (confirmation required). All comps \226\128\148 including the default raid presets \226\128\148 live in |ck[WardenDB.comps]| and are fully editable. Use Settings \226\134\146 Maintenance \226\134\146 Restore default presets to re-seed any defaults you've deleted." },
+            { kind = "p",    text = "|kbd[Save]| stores the current comp (name + size + slot positions + isPlayer flags). |kbd[Load]| restores it by name. |kbd[Delete]| removes the comp named in the COMP box (confirmation required). All comps \226\128\148 including the default raid presets \226\128\148 live in |ck[WardenDB.comps]| and are fully editable. Use Settings \226\134\146 Maintenance \226\134\146 Restore default presets to re-seed any defaults you've deleted." },
             { kind = "h2",   text = "Import and export" },
-            { kind = "p",    text = "|kbd[export]| produces a portable |ck[WRDN2:]| string that carries the full comp (name, size, slot positions, isPlayer, blessings). |kbd[import]| accepts the same string. |ck[WRDN1:]| strings from older versions still parse (loose slot order, no player flags)." },
+            { kind = "p",    text = "|kbd[Export]| produces a portable |ck[WRDN2:]| string that carries the full comp (name, size, slot positions, isPlayer, blessings). |kbd[Import]| accepts the same string. |ck[WRDN1:]| strings from older versions still parse (loose slot order, no player flags)." },
             { kind = "h2",   text = "Clear and cleanup" },
-            { kind = "p",    text = "|kbd[clear]| empties the grid locally (no server command). |kbd[cleanup]| sends |ck[.warstormbot bot remove *]| to despawn every bot in the raid (confirmation popup)." },
+            { kind = "p",    text = "|kbd[Clear]| empties the grid locally (no server command). |kbd[Cleanup]| sends |ck[.warstormbot bot remove *]| to despawn every bot in the raid (confirmation popup)." },
             { kind = "h2",   text = "Presets" },
             { kind = "p",    text = "Eleven default raid presets (5-man + Onyxia / Ulduar / ToC / ICC / Ruby Sanctum 10 & 25) are seeded on first use and behave like any other saved comp \226\128\148 fully editable and deletable. Picking one loads the grid; your typed comp name is replaced." },
             { kind = "h2",   text = "Speccing a bot" },
@@ -249,9 +249,9 @@ local CHAPTERS = {
             { kind = "h2",   text = "Open and close" },
             { kind = "p",    text = "|ck[/wsh]| toggles. The header |kbd[o]| glyph locks/unlocks position. |kbd[x]| closes. State persists across |ck[/reload]|." },
             { kind = "h2",   text = "Target anchor and locking" },
-            { kind = "p",    text = "Top band shows the live target in dim type. Click |kbd[pick]| to freeze it (class-coloured name + |kbd[LOCKED]| indicator). Future |ck[los]| / |ck[spells]| whispers go to the locked bot even if you retarget in-game. Useful when managing support bots during raids." },
+            { kind = "p",    text = "Top band shows the live target in dim type. Click |kbd[Pick]| to freeze it (class-coloured name + |kbd[LOCKED]| indicator). Future |ck[los]| / |ck[spells]| whispers go to the locked bot even if you retarget in-game. Useful when managing support bots during raids." },
             { kind = "h2",   text = "Action row" },
-            { kind = "p",    text = "|kbd[los]| lists nearby objects, |kbd[spells]| lists the bot's spells. |kbd[clear]| wipes the captured list and unlocks the target. The active button flashes gold while the capture window is open (~5s by default)." },
+            { kind = "p",    text = "|kbd[los]| lists nearby objects, |kbd[spells]| lists the bot's spells. |kbd[Clear]| wipes the captured list and unlocks the target. The active button flashes gold while the capture window is open (~5s by default)." },
             { kind = "h2",   text = "Mode (segmented)" },
             { kind = "p",    text = "Five mutually-exclusive modes set what clicking a row does: |kbd[cast]| (whisper the spell/object), |kbd[on Y]| (cast on a captured unit), |kbd[on me]| (cast on yourself), |kbd[ban]| / |kbd[unban]| (toggle the bot's exclude list)." },
             { kind = "h2",   text = "Cast-on chip" },
@@ -259,9 +259,9 @@ local CHAPTERS = {
             { kind = "h2",   text = "Exclusion management" },
             { kind = "p",    text = "Instead of typing raw |ck[ss +2825]| / |ck[ss -2825]|, view the spell list, see which are currently banned (red dot, dimmed text), and click to toggle. Especially useful for Bloodlust control, AI cleanup, and preventing unwanted spell usage." },
             { kind = "h2",   text = "Filter" },
-            { kind = "p",    text = "When a capture has more than 20 items, a text filter appears above the list. Case-insensitive substring match on the payload. Wipes on |kbd[clear]| and on every new |ck[los]| / |ck[spells]|." },
+            { kind = "p",    text = "When a capture has more than 20 items, a text filter appears above the list. Case-insensitive substring match on the payload. Wipes on |kbd[Clear]| and on every new |ck[los]| / |ck[spells]|." },
             { kind = "h2",   text = "Footer" },
-            { kind = "p",    text = "|kbd[hide gray]| filters out spells the bot can't currently cast \226\128\148 auto-bypassed in |kbd[ban]| / |kbd[unban]| modes. |kbd[exclusions: N]| toggles a view that lists every persisted exclusion (click a row to unban). |kbd[reset all]| whispers |ck[ss reset]| to the locked bot and wipes the local mirror." },
+            { kind = "p",    text = "|kbd[Hide Gray]| filters out spells the bot can't currently cast \226\128\148 auto-bypassed in |kbd[ban]| / |kbd[unban]| modes. |kbd[exclusions: N]| toggles a view that lists every persisted exclusion (click a row to unban). |kbd[Reset All]| whispers |ck[ss reset]| to the locked bot and wipes the local mirror." },
             { kind = "h2",   text = "Multi-bot" },
             { kind = "p",    text = "If you capture from several different bots in a row, each row gets a small gold-dim tag on the right showing which bot produced it. Click dispatches to that bot, not the currently-locked target." },
             { kind = "h2",   text = "Commands" },
@@ -715,15 +715,7 @@ local function buildRail(parent)
     sf:SetPoint("TOPLEFT",     rail, "TOPLEFT",      6, -32)
     sf:SetPoint("BOTTOMRIGHT", rail, "BOTTOMRIGHT", -6,   8)
 
-    local sb = _G["WardenHelpRailScrollScrollBar"]
-    if sb then
-        if sb.ScrollUpButton   then sb.ScrollUpButton:Hide()   end
-        if sb.ScrollDownButton then sb.ScrollDownButton:Hide() end
-        sb:ClearAllPoints()
-        sb:SetPoint("TOPLEFT",    sf, "TOPRIGHT", 2, 0)
-        sb:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 2, 0)
-        sb:SetWidth(6)
-    end
+    ns.UI.ThinScrollbar(sf, 6)
 
     local list = CreateFrame("Frame", nil, sf)
     list:SetSize(RAIL_W - 14, 10)
@@ -811,15 +803,7 @@ local function buildReader(parent)
     sf:SetPoint("TOPLEFT",     reader, "TOPLEFT",      0,                0)
     sf:SetPoint("BOTTOMRIGHT", reader, "BOTTOMRIGHT", -SCROLLBAR_PAD,    0)
 
-    local sb = _G["WardenHelpReaderScrollScrollBar"]
-    if sb then
-        if sb.ScrollUpButton   then sb.ScrollUpButton:Hide()   end
-        if sb.ScrollDownButton then sb.ScrollDownButton:Hide() end
-        sb:ClearAllPoints()
-        sb:SetPoint("TOPLEFT",    sf, "TOPRIGHT", 2, 0)
-        sb:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 2, 0)
-        sb:SetWidth(SCROLLBAR_W)
-    end
+    ns.UI.ThinScrollbar(sf, SCROLLBAR_W)
 
     local content = CreateFrame("Frame", nil, sf)
     -- Width follows the reader at build time; resized again if the parent

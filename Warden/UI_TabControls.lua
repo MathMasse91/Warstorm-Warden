@@ -142,9 +142,9 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
     local groups = {
         -- dbKey: AoE / Burn share their saved state with the WardenSword HUD
         -- toggles, so a click here must update it too or the two drift apart.
-        { label = "aoe",     dbKey = "aoe",  on = { "ON",    "co +aoe,-assist,-focus,?" }, off = { "off",       "co -aoe,+assist,+focus,?" } },
-        { label = "burn cd", dbKey = "burn", on = { "burn",  "co +boost,?" },              off = { "stop",      "co -boost,?" }               },
-        { label = "face",    on = { "behind","co +behind,?" },             off = { "no flank",  "co -behind,?" }              },
+        { label = "aoe",     dbKey = "aoe",  on = { "On",    "co +aoe,-assist,-focus,?" }, off = { "Off",       "co -aoe,+assist,+focus,?" } },
+        { label = "burn cd", dbKey = "burn", on = { "Burn",  "co +boost,?" },              off = { "Stop",      "co -boost,?" }               },
+        { label = "face",    on = { "Behind","co +behind,?" },             off = { "No Flank",  "co -behind,?" }              },
     }
     local groupW = math.floor((pw - 20) / 3)
     for i, g in ipairs(groups) do
@@ -156,15 +156,48 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
 
         local onBtn  = ns.UI.Button.stone(stratP.content, g.on[1],  64, 20)
         onBtn:SetPoint("TOPLEFT", stratP.content, "TOPLEFT", x, -18)
-        local function setState(v)
-            local db = ns.Persistence.DB
-            if g.dbKey and db then db[g.dbKey] = v end
-        end
-        onBtn:SetScript("OnClick", function() send(g.on[2]); setState(true); ns.MsgInfo(g.on[2]) end)
-
         local offBtn = ns.UI.Button.stone(stratP.content, g.off[1], 64, 20)
         offBtn:SetPoint("TOPLEFT", stratP.content, "TOPLEFT", x + 68, -18)
-        offBtn:SetScript("OnClick", function() send(g.off[2]); setState(false); ns.MsgInfo(g.off[2]) end)
+
+        -- U11: the active side of each pair reads gold (same colors as the
+        -- WardenSword AoE/Burn toggles). AoE/Burn read their saved state;
+        -- "face" has none, so it remembers the last click for the session.
+        local lastFace
+        local function paint()
+            local db = ns.Persistence.DB
+            local on
+            if g.dbKey then on = db and db[g.dbKey] else on = lastFace end
+            local function tint(btn, active)
+                local fs = btn:GetFontString()
+                if not fs then return end
+                if active then fs:SetTextColor(1.00, 0.82, 0.00)
+                else fs:SetTextColor(0.72, 0.58, 0.21) end
+            end
+            tint(onBtn,  on == true)
+            tint(offBtn, on == false)
+        end
+        local function setState(v)
+            local db = ns.Persistence.DB
+            if g.dbKey then
+                if db then db[g.dbKey] = v end
+            else
+                lastFace = v
+            end
+            paint()
+        end
+        onBtn:SetScript("OnClick", function()
+            send(g.on[2]); setState(true)
+            ns.MsgInfo(string.format("%s: %s (sent `%s`).", string.upper(g.label), g.on[1], g.on[2]))
+        end)
+        offBtn:SetScript("OnClick", function()
+            send(g.off[2]); setState(false)
+            ns.MsgInfo(string.format("%s: %s (sent `%s`).", string.upper(g.label), g.off[1], g.off[2]))
+        end)
+        addTooltip(onBtn,  g.on[1],  "Sends `" .. g.on[2]  .. "` to your group.", "ANCHOR_TOP")
+        addTooltip(offBtn, g.off[1], "Sends `" .. g.off[2] .. "` to your group.", "ANCHOR_TOP")
+        -- Re-paint when the tab reappears (the HUD may have flipped AoE/Burn).
+        stratP:HookScript("OnShow", paint)
+        paint()
     end
 
     -- ============================================================
@@ -260,7 +293,7 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
     end)
     UIDropDownMenu_SetText(formDrop, FORMATION_LABEL[formState.cur])
 
-    local setBtn = ns.UI.Button.stone(marksP.content, "set", 40, 20)
+    local setBtn = ns.UI.Button.stone(marksP.content, "Set", 40, 20)
     setBtn:SetPoint("LEFT", formDrop, "RIGHT", -2, 2)
     setBtn:SetScript("OnClick", function()
         send("formation " .. formState.cur)
@@ -268,7 +301,7 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
     end)
     -- Match "set" width so the two buttons read as a pair; the label still
     -- fits at 44px (GameFontNormalSmall renders "check" in ~32px).
-    local chkBtn = ns.UI.Button.stone(marksP.content, "check", 44, 20)
+    local chkBtn = ns.UI.Button.stone(marksP.content, "Check", 44, 20)
     chkBtn:SetPoint("LEFT", setBtn, "RIGHT", 4, 0)
     chkBtn:SetScript("OnClick", function() send("formation") end)
 
@@ -295,8 +328,12 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
     -- Column headers
     for ai, act in ipairs(ROLE_ACTIONS) do
         local fs = roleP.content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        -- Column-wide, centered: the old "+ mCellW/2 - 12" guessed half the
+        -- text width, so every header sat off-center by a different amount.
         fs:SetPoint("TOPLEFT", roleP.content, "TOPLEFT",
-            labelW + 8 + (ai - 1) * (mCellW + cellGap) + mCellW / 2 - 12, headerY)
+            labelW + 8 + (ai - 1) * (mCellW + cellGap), headerY)
+        fs:SetWidth(mCellW)
+        fs:SetJustifyH("CENTER")
         fs:SetText(ACTION_LABEL[act])
         fs:SetTextColor(0.72, 0.58, 0.21, 1)
     end
@@ -400,14 +437,28 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
     local resetAIBtn = ns.UI.Button.red(dangerP.content, "Reset AI", dangerW, 22)
     resetAIBtn:SetPoint("TOPLEFT", dangerP.content, "TOPLEFT", 4 + dangerW + 6, dangerY)
     resetAIBtn:SetScript("OnClick", function()
-        send("reset botAI"); ns.MsgWarn("Sent `reset botAI`.")
+        ns.UI.Confirm("Reset every bot's AI?\n(sends `reset botAI` - strategies go back to defaults)", function()
+            send("reset botAI"); ns.MsgWarn("Sent `reset botAI`.")
+        end)
     end)
 
-    local hardBtn = ns.UI.Button.warn(dangerP.content, "Hard ReSpec", dangerW, 22, "WARDEN_CONFIRM_HARD_RESPEC")
+    local hardBtn = ns.UI.Button.warn(dangerP.content, "Hard ReSpec", dangerW, 22)
     hardBtn:SetPoint("TOPLEFT", dangerP.content, "TOPLEFT", 4 + 2 * (dangerW + 6), dangerY)
+    hardBtn:SetScript("OnClick", function()
+        local r = ns.Persistence.GetInitRarity()
+        StaticPopup_Show("WARDEN_CONFIRM_HARD_RESPEC", r, r)
+    end)
 
     local cleanupBtn = ns.UI.Button.warn(dangerP.content, "Cleanup", dangerW, 22, "WARDEN_CONFIRM_CLEANUP")
     cleanupBtn:SetPoint("TOPLEFT", dangerP.content, "TOPLEFT", 4 + 3 * (dangerW + 6), dangerY)
+
+    -- U9: say what each danger button sends and to whom.
+    addTooltip(resetAIBtn, "Reset AI",
+        "Sends `reset botAI` to the group: every bot's strategies go back to defaults. Asks first.", "ANCHOR_TOP")
+    addTooltip(hardBtn, "Hard ReSpec",
+        "Sends `.warstormbot bot init=<rarity>` (rarity from BOT INIT): re-rolls ALL bots' gear and talents. Asks first.", "ANCHOR_TOP")
+    addTooltip(cleanupBtn, "Cleanup",
+        "Sends `.warstormbot bot remove *`: despawns every bot. Asks first.", "ANCHOR_TOP")
 
     -- ============================================================
     -- Summon by class - bottom panel. 2x5 grid of class-colored buttons.
@@ -419,7 +470,7 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
     -- class-colored label (matches the chip tray aesthetic).
     -- ============================================================
     local classH = 66
-    local classP = ns.UI.Panel.Create(pane, pw, classH, "Summon by class")
+    local classP = ns.UI.Panel.Create(pane, pw, classH, "Add bot by class")
     classP:SetPoint("TOPLEFT", pane, "TOPLEFT", 8, nextY(classH))
     addPanelMeta(classP, "adds one bot per click")
 
