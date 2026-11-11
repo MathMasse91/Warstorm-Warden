@@ -250,6 +250,9 @@ local function createRowWidget()
 
     local cb = CreateFrame("CheckButton", rowName .. "Cb", f, "InterfaceOptionsCheckButtonTemplate")
     cb:SetSize(20, 20)
+    -- The template widens the hit rect 100px right for its label; this box
+    -- has no label, so clicks on the avatar / name toggled the selection.
+    cb:SetHitRectInsets(0, 0, 0, 0)
     cb:SetPoint("LEFT", pBtn, "RIGHT", 4, 0)
     cb:SetScript("OnClick", function(self)
         local row = self:GetParent()._row
@@ -268,13 +271,18 @@ local function createRowWidget()
     -- Two-line name block
     local nmTop = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     nmTop:SetPoint("TOPLEFT", av, "TOPRIGHT", 6, 0)
-    nmTop:SetWidth(160)
+    nmTop:SetWidth(150)
     nmTop:SetJustifyH("LEFT")
+    -- 12-char wide-glyph names + " (you)" exceed 150px; wrapping would push
+    -- nmBot below the 24px row. Truncate instead.
+    nmTop:SetWordWrap(false)
 
     local nmBot = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     nmBot:SetPoint("TOPLEFT", nmTop, "BOTTOMLEFT", 0, -1)
-    nmBot:SetWidth(160)
+    nmBot:SetWidth(150)
     nmBot:SetJustifyH("LEFT")
+    nmBot:SetWordWrap(false)  -- e.g. "Warlock - destro pvp": never wrap into the next row
+    nmBot:SetTextColor(0.45, 0.38, 0.29)  -- mock #736149
 
     -- Spec dropdown
     local specDrop = CreateFrame("Frame", rowName .. "Spec", f, "UIDropDownMenuTemplate")
@@ -288,8 +296,12 @@ local function createRowWidget()
     -- (what the comp assigned), not the live buff status on the unit.
     local chipHolder = CreateFrame("Frame", nil, f)
     chipHolder:EnableMouse(true)
-    chipHolder:SetSize(160, 14)
-    chipHolder:SetPoint("LEFT", specDrop, "RIGHT", 14, 0)
+    -- 4 chips x 38 step = 150 wide. Starts 6px inside the dropdown frame's
+    -- right padding (its arrow ends 16px before the frame edge) so a 4-chip
+    -- row (Paladin / Shaman) ends ~8px left of the G<n> raid-group button
+    -- instead of sliding under it (was 14px out + 40 step -> 30px overlap).
+    chipHolder:SetSize(150, 14)
+    chipHolder:SetPoint("LEFT", specDrop, "RIGHT", -6, 0)
     chipHolder:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:SetText("Comp-assigned buffs", 1, 1, 1)
@@ -461,6 +473,7 @@ local function rebuild()
             h.pill:SetBackdropBorderColor(0.23, 0.18, 0.13, 1)
             h.pillText = h.pill:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
             h.pillText:SetPoint("CENTER", h.pill, "CENTER", 0, 0)
+            h.pillText:SetTextColor(0.80, 0.72, 0.54)  -- mock #cbb98a
             -- PATCH_NOTES §12d: per-section empty-state placeholder shown
             -- when the section has 0 tracked members.
             h.emptyLbl = content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -493,11 +506,11 @@ local function rebuild()
 
             for _, row in ipairs(list) do
                 -- Name block: top line = class-colored name (+ mono "(you)")
-                local suffix = UnitIsUnit(row._unitId, "player") and " |cff808080(you)|r" or ""
+                local suffix = UnitIsUnit(row._unitId, "player") and " |cff736149(you)|r" or ""
                 row.nmTop:SetText(colorClass(row.classToken, row.name) .. suffix)
                 -- Bottom line = "Class - spec" muted
                 local classLabel = ns.Data.CLASS_LABEL and ns.Data.CLASS_LABEL[row.classToken] or row.classToken
-                row.nmBot:SetText(string.format("%s - %s", classLabel, row.spec or "-"))
+                row.nmBot:SetText(string.format("%s \194\183 %s", classLabel, row.spec or "-"))
 
                 -- Avatar (class circle)
                 local tc = CLASS_ICON[row.classToken]
@@ -521,19 +534,11 @@ local function rebuild()
                             row.chips[i] = chip
                         else
                             -- Update existing chip's on-state + label in place.
-                            if p.on then
-                                chip:SetBackdropColor(0.22, 0.17, 0.08, 1)
-                                chip:SetBackdropBorderColor(0.72, 0.58, 0.21, 1)
-                                chip.label:SetTextColor(1.00, 0.82, 0.00, 1)
-                            else
-                                chip:SetBackdropColor(0.08, 0.06, 0.04, 1)
-                                chip:SetBackdropBorderColor(0.30, 0.24, 0.18, 1)
-                                chip.label:SetTextColor(0.45, 0.38, 0.28, 1)
-                            end
+                            ns.UI.Chip.paint(chip, p.on)
                             chip.label:SetText(p.label)
                         end
                         chip:ClearAllPoints()
-                        chip:SetPoint("LEFT", row.chipHolder, "LEFT", (i - 1) * 40, 0)
+                        chip:SetPoint("LEFT", row.chipHolder, "LEFT", (i - 1) * 38, 0)
                         chip:Show()
                     end
                 end
@@ -662,7 +667,7 @@ local function rebuild()
 
     if frame.headerCount then
         local tot = members
-        frame.headerCount:SetText(string.format("roster - %d raid member%s",
+        frame.headerCount:SetText(string.format("roster \194\183 %d raid member%s",
             tot, tot == 1 and "" or "s"))
     end
 
@@ -680,7 +685,8 @@ function ns.UI.Tabs.Roster.BuildInto(pane)
     -- Subtitle-style header (matches wireframe "roster - 24 raid members")
     local count = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     count:SetPoint("TOP", frame, "TOP", 0, -8)
-    count:SetText("roster - 0 raid members")
+    count:SetText("roster \194\183 0 raid members")
+    count:SetTextColor(0.45, 0.38, 0.29)  -- mock #736149
     frame.headerCount = count
 
     -- Filter row
@@ -792,6 +798,7 @@ function ns.UI.Tabs.Roster.BuildInto(pane)
     local selLbl = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     selLbl:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -16, 20)
     selLbl:SetText("0 selected")
+    selLbl:SetTextColor(0.45, 0.38, 0.29)  -- mock #736149
     frame.selCountLbl = selLbl
 
     -- Roster changes rebuild the list. (UNIT_AURA used to be watched too, but

@@ -160,6 +160,9 @@ ns.Tokens = {
     green      = { _hex("2ecc40") },
     amber      = { _hex("ff9a00") },
     text_warm  = { _hex("ffebbf") }, -- off-white for red-btn labels
+    parchment  = { _hex("e6d5a8") }, -- body text / control labels (mock)
+    text_dim   = { _hex("9c8c66") }, -- secondary captions / meta (mock)
+    text_mute  = { _hex("736149") }, -- tertiary hints / footer (mock)
 }
 
 -- =====================================================================
@@ -353,8 +356,13 @@ function ns.UI.ThinScrollbar(sf, width)
     if not sb then return end
     local up   = sb.ScrollUpButton   or _G[name .. "ScrollBarScrollUpButton"]
     local down = sb.ScrollDownButton or _G[name .. "ScrollBarScrollDownButton"]
-    if up   then up:Hide()   end
-    if down then down:Hide() end
+    -- Hide() alone does not stick: ScrollFrame_OnScrollRangeChanged re-Shows
+    -- both arrows on every content-height change. Alpha 0 + mouse off keeps
+    -- the 16px arrows (wider than this thin bar, sitting above/below it)
+    -- invisible and click-through even after the template re-shows them.
+    for _, btn in pairs({ up, down }) do  -- pairs: skips a nil arrow
+        btn:Hide(); btn:SetAlpha(0); btn:EnableMouse(false)
+    end
     sb:ClearAllPoints()
     sb:SetPoint("TOPLEFT",    sf, "TOPRIGHT",    2, 0)
     sb:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 2, 0)
@@ -434,7 +442,11 @@ function ns.UI.Check.Make(parent, globalName, label, dbTable, key, opts)
     opts = opts or {}
     local cb = CreateFrame("CheckButton", globalName, parent,
                            "InterfaceOptionsCheckButtonTemplate")
-    _G[cb:GetName() .. "Text"]:SetText(label)
+    local cbText = _G[cb:GetName() .. "Text"]
+    cbText:SetText(label)
+    -- Template default is white GameFontHighlight; mock labels are parchment.
+    local P = ns.Tokens.parchment
+    cbText:SetTextColor(P[1], P[2], P[3], 1)
     cb:SetScript("OnShow", function(self)
         self:SetChecked(dbTable and dbTable[key] == true)
     end)
@@ -458,26 +470,31 @@ end
 -- gold rim when ON, muted rim when OFF. Shares the exact stone-button
 -- color tokens so dropdown / chip / Re-Spec button all feel like one family.
 ns.UI.Chip = ns.UI.Chip or {}
+-- Paint a provide chip ON/OFF with the mock's chip colors (ON #221708 bg,
+-- #b89436 rim, gold text; OFF #120d07 bg, stone rim, #5b4d3a text). Shared
+-- by Chip.provide and the Roster tab's in-place chip refresh.
+function ns.UI.Chip.paint(c, on)
+    local T = ns.Tokens
+    if on then
+        c:SetBackdropColor(0.13, 0.09, 0.03, 1)
+        c:SetBackdropBorderColor(T.gold_dim[1], T.gold_dim[2], T.gold_dim[3], 1)
+        if c.label then c.label:SetTextColor(T.gold[1], T.gold[2], T.gold[3], 1) end
+    else
+        c:SetBackdropColor(0.07, 0.05, 0.03, 1)
+        c:SetBackdropBorderColor(T.stone_rim[1], T.stone_rim[2], T.stone_rim[3], 1)
+        if c.label then c.label:SetTextColor(0.36, 0.30, 0.23, 1) end
+    end
+end
+
 function ns.UI.Chip.provide(parent, label, on)
     local c = CreateFrame("Frame", nil, parent)
     c:SetSize(36, 14)
     c:SetBackdrop(ns.UI.FLAT_BACKDROP)
-    if on then
-        c:SetBackdropColor(0.22, 0.17, 0.08, 1)
-        c:SetBackdropBorderColor(0.72, 0.58, 0.21, 1)
-    else
-        c:SetBackdropColor(0.08, 0.06, 0.04, 1)
-        c:SetBackdropBorderColor(0.30, 0.24, 0.18, 1)
-    end
     local t = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     t:SetPoint("CENTER", c, "CENTER", 0, 0)
     t:SetText(label)
-    if on then
-        t:SetTextColor(1.00, 0.82, 0.00, 1)
-    else
-        t:SetTextColor(0.45, 0.38, 0.28, 1)
-    end
     c.label = t
+    ns.UI.Chip.paint(c, on)
     return c
 end
 
@@ -752,7 +769,7 @@ ns.UI.HudChrome = ns.UI.HudChrome or {}
 
 local GOLD_DEFAULT = { 1.00, 0.82, 0.00 }   -- title + locked glyph
 local RIM_DEFAULT  = { 0.23, 0.18, 0.13 }   -- bottom divider rule
-local HINT_DIM     = { 0.55, 0.50, 0.42 }   -- /slash hint + unlocked glyph
+local HINT_DIM     = { 0.45, 0.38, 0.29 }   -- /slash hint + unlocked glyph (mock #736149)
 
 -- Build the standard HUD title bar: title + /slash hint on the left, a lock
 -- toggle and a red close "x" on the right, and a 1px divider underneath.
@@ -791,7 +808,7 @@ function ns.UI.HudChrome.BuildHeader(parent, opts)
     local cfs = close:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     cfs:SetPoint("CENTER", close, "CENTER", 0, 0)
     cfs:SetText("x")
-    cfs:SetTextColor(0.85, 0.18, 0.12, 1)
+    cfs:SetTextColor(0.85, 0.21, 0.16, 1)  -- mock #d8362a
     close:SetScript("OnClick", opts.onClose)
     ns.UI.Tooltip.Attach(close, "Close", opts.hint and ("Hide this HUD (reopen with " .. opts.hint .. ").") or nil, "ANCHOR_TOP")
 

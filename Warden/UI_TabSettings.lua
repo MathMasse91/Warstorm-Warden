@@ -77,6 +77,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     local sizeLbl = globalP.content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sizeLbl:SetPoint("TOPLEFT", globalP.content, "TOPLEFT", 4, -56)
     sizeLbl:SetText("Window size")
+    sizeLbl:SetTextColor(ns.Tokens.parchment[1], ns.Tokens.parchment[2], ns.Tokens.parchment[3])  -- mock #e6d5a8
 
     local sizeDrop = CreateFrame("Frame", "WardenSizeDrop", globalP.content, "UIDropDownMenuTemplate")
     sizeDrop:SetPoint("TOPLEFT", sizeLbl, "BOTTOMLEFT", -16, -4)
@@ -109,7 +110,10 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
         ns.WhisperBlocker.SeedDefaults()
     end
 
-    local whisperP = ns.UI.Panel.Create(content, contentW - 16, 302, "Bot whisper filter")
+    -- 312: 9 filter rows step 22 from -82 put the last 26px checkbox bottom at
+    -- -284; content area is 312 - 20 header - 6 bottom = 286 (was 302 -> 276,
+    -- last checkbox sat on the panel border).
+    local whisperP = ns.UI.Panel.Create(content, contentW - 16, 312, "Bot whisper filter")
     whisperP:SetPoint("TOPLEFT", globalP, "BOTTOMLEFT", 0, -6)
 
     -- Everything below the master switch (warning note, "LINES TO HIDE"
@@ -130,12 +134,12 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
         :SetPoint("TOPLEFT", whisperP.content, "TOPLEFT", 4, -2)
 
     local whispWarn = whisperP.content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    whispWarn:SetPoint("TOPLEFT", whisperP.content, "TOPLEFT",  6, -26)
-    whispWarn:SetPoint("RIGHT",   whisperP.content, "RIGHT",   -6,   0)
+    whispWarn:SetPoint("TOPLEFT", whisperP.content, "TOPLEFT",  4, -26)  -- same x as every other row
+    whispWarn:SetPoint("RIGHT",   whisperP.content, "RIGHT",   -4,   0)
     whispWarn:SetJustifyH("LEFT")
     whispWarn:SetWordWrap(true)
     whispWarn:SetText("|cffffaa00Note:|r a real player could in theory whisper one of these exact lines. Untick any line below to keep it visible. Party/raid members are never affected by the invite lines.")
-    whispWarn:SetTextColor(0.85, 0.72, 0.4, 1)
+    whispWarn:SetTextColor(0.80, 0.72, 0.54, 1)  -- mock secondary body #cbb98a
     table.insert(whisperKids, whispWarn)
 
     local linesLbl = whisperP.content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -175,6 +179,9 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
         local col = ((i - 1) % 3)
         local row = math.floor((i - 1) / 3)
         local fs = statsP.content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        -- Label parchment, value gold (mock). The template's gold label made
+        -- "Spawned: 24" one undifferentiated gold run.
+        fs:SetTextColor(ns.Tokens.parchment[1], ns.Tokens.parchment[2], ns.Tokens.parchment[3])
         fs:SetPoint("TOPLEFT", statsP.content, "TOPLEFT",
             4 + col * 170, -4 - row * 18)
         statFS[def[2]] = { fs = fs, label = def[1] }
@@ -382,6 +389,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     aboutTxt:SetPoint("TOPLEFT",     aboutP.content, "TOPLEFT",      4, -4)
     aboutTxt:SetPoint("BOTTOMRIGHT", aboutP.content, "BOTTOMRIGHT", -4,  4)
     aboutTxt:SetJustifyH("LEFT")
+    aboutTxt:SetTextColor(ns.Tokens.parchment[1], ns.Tokens.parchment[2], ns.Tokens.parchment[3])  -- body, not header gold
     aboutTxt:SetJustifyV("TOP")
     aboutTxt:SetWordWrap(true)
     aboutTxt:SetNonSpaceWrap(false)

@@ -169,7 +169,7 @@ local function buildRoleMatrix(parent)
     for i, role in ipairs(rows) do
         local lbl = g:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
         lbl:SetText(ROLE_LBL[role])
-        lbl:SetTextColor(0.72, 0.58, 0.21, 1)
+        lbl:SetTextColor(ns.Tokens.parchment[1], ns.Tokens.parchment[2], ns.Tokens.parchment[3], 1)  -- mock #e6d5a8
 
         local fol = ns.UI.Button.stone(g, "Follow", 60, 22)
         tagRim(fol, ns.Tokens.stone_rim)
@@ -219,17 +219,21 @@ function ns.WardenSword.RefreshBLButton()
     local d = db(); if not d then return end
     local on = d.bloodlust == true
     local fs = b:GetFontString()
+    local T = ns.Tokens
     if on then
-        b:SetBackdropColor(0.48, 0.10, 0.07, 1)              -- red fill
-        b:SetBackdropBorderColor(0.72, 0.20, 0.12, 1)        -- red rim
-        if fs then fs:SetTextColor(1.00, 0.92, 0.75, 1) end  -- warm white
+        local RIM = { 0.72, 0.20, 0.12 }                     -- red rim
+        b:SetBackdropColor(T.red_btn[1], T.red_btn[2], T.red_btn[3], 1)
+        b:SetBackdropBorderColor(RIM[1], RIM[2], RIM[3], 1)
+        b._tokRim = RIM                                      -- pulseBtn restores this
+        if fs then fs:SetTextColor(T.text_warm[1], T.text_warm[2], T.text_warm[3], 1) end
         b:SetText("Bloodlust \194\183 ON")
     else
-        local STONE = ns.Tokens.stone_tile
-        local RIM   = ns.Tokens.stone_rim
-        b:SetBackdropColor(STONE[1], STONE[2], STONE[3], 1)
-        b:SetBackdropBorderColor(RIM[1], RIM[2], RIM[3], 1)
-        if fs then fs:SetTextColor(0.55, 0.50, 0.42, 1) end  -- gold_dim
+        -- Mock: stone fill, gold_rim edge, amber label (same amber as the
+        -- footer "BL OFF" pill). Was an off-palette gray-brown.
+        b:SetBackdropColor(T.stone_tile[1], T.stone_tile[2], T.stone_tile[3], 1)
+        b:SetBackdropBorderColor(T.gold_rim[1], T.gold_rim[2], T.gold_rim[3], 1)
+        b._tokRim = T.gold_rim
+        if fs then fs:SetTextColor(T.amber[1], T.amber[2], T.amber[3], 1) end
         b:SetText("Bloodlust")
     end
 end
@@ -321,11 +325,12 @@ local function layout()
             bodyWidgets.roles:Show()
             stackContainer(bodyWidgets.roles, btnH * 3 + GAP * 2)
             local labelW = 44
-            local col = math.floor((width - PAD * 2 - labelW - GAP * 3) / 3)
+            local col = math.floor((width - PAD * 2 - labelW - GAP * 2) / 3)  -- 3 cells, 2 gaps: right edge = width - PAD
             for i, row in ipairs(bodyWidgets.roleRows) do
                 local ry = -((i - 1) * (btnH + GAP))
                 row.lbl:ClearAllPoints()
-                row.lbl:SetPoint("TOPLEFT", bodyWidgets.roles, "TOPLEFT", PAD, ry - 2)
+                -- Centered on the button row (TOPLEFT -2 sat high at every density).
+                row.lbl:SetPoint("LEFT", bodyWidgets.roles, "TOPLEFT", PAD, ry - btnH / 2)
                 row.lbl:SetWidth(labelW)
                 row.atk:SetSize(col, btnH)
                 reanchor(row.atk, bodyWidgets.roles, PAD + labelW, ry)

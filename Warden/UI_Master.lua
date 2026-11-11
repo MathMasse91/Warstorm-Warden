@@ -14,7 +14,10 @@ local MASTER_W, MASTER_H = 760, 600
 local CONTENT_MARGIN_T   = 44  -- below title
 local CONTENT_MARGIN_B   = 30  -- PATCH_NOTES §3: tabs now tuck flush (was 38)
 local CONTENT_MARGIN_X   = 16
-local FOOTER_H           = 22
+-- Footer spans frame-bottom +10..+30 so its top meets the pane bottom
+-- (CONTENT_MARGIN_B) instead of overlapping it: at 22 it covered the last
+-- 2px of every pane (Controls' "Add bot by class" rim, Help reader tail).
+local FOOTER_H           = 20
 
 local TAB_DEFS = {
     { key = "Spec",     label = "Spec"     },
@@ -215,7 +218,9 @@ local function buildFrame()
         -- shared z-order with the game's party frames (see grouping fix).
         local bg = pane:CreateTexture(nil, "BACKGROUND")
         bg:SetTexture("Interface\\Buttons\\WHITE8x8")
-        bg:SetVertexColor(0.10, 0.08, 0.05, 1.00)
+        -- Interior tone (mock #0e0a05), NOT the panel tone: at 0.10/0.08/0.05
+        -- the pane matched Panel.Create's fill and every panel lost its body.
+        bg:SetVertexColor(0.055, 0.04, 0.02, 1.00)
         bg:SetAllPoints(pane)
         pane:Hide()
         panes[i] = pane
@@ -257,15 +262,17 @@ local function buildFrame()
 
     local targetLbl = footer:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     targetLbl:SetPoint("LEFT", dot, "RIGHT", 6, 0)
-    targetLbl:SetText("|cff808080no target|r")
+    targetLbl:SetText("|cff9c8c66no target|r")
 
     local statsLbl = footer:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     statsLbl:SetPoint("LEFT", targetLbl, "RIGHT", 18, 0)
     statsLbl:SetText("q 0 \194\183 tracked 0")  -- same shape as refreshFooter; BL has its own pill
+    statsLbl:SetTextColor(0.45, 0.38, 0.29)  -- mock #736149 (template default is neutral gray)
 
     local hintLbl = footer:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hintLbl:SetPoint("RIGHT", footer, "RIGHT", -4, 0)
-    hintLbl:SetText("Esc close  -  /warden")
+    hintLbl:SetText("Esc close \194\183 /warden")
+    hintLbl:SetTextColor(0.45, 0.38, 0.29)  -- mock #736149
 
     -- TASKS.md §8.2: BL mini-pill 54x16. Stone bg (reuses our stone button
     -- texture so it matches the rest of the addon), label color swaps
@@ -312,7 +319,7 @@ local function buildFrame()
             local _, classTok = UnitClass("target")
             targetLbl:SetText(ns.ColorClass(classTok or "", name))
         else
-            targetLbl:SetText("|cff808080no target|r")
+            targetLbl:SetText("|cff9c8c66no target|r")
         end
 
         local qDepth = (ns.Engine.QueueDepth and ns.Engine.QueueDepth()) or 0

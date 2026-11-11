@@ -63,7 +63,7 @@ local addTooltip = ns.UI.Tooltip.Attach
 -- Panel header right-side meta text (small, muted mono)
 local function addPanelMeta(panel, text)
     local fs = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    fs:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -6, -4)
+    fs:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -8, -4)  -- = header x / rule end
     fs:SetText(text)
     fs:SetTextColor(0.61, 0.55, 0.40)
     return fs
@@ -100,8 +100,10 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
     -- 3 columns x 2 rows. Each cell spans (pw - 16) / 3 wide.
     local cellW = math.floor((pw - 20 - 2 * 6) / 3)
     local topH, botH = 30, 22
-    local rowY1 = -4
-    local rowY2 = rowY1 - topH - 5
+    -- Content area is 82 - 20 - 6 = 56px: -2 / -36 puts the 22px bottom row
+    -- at -58, clear of the panel rim (was -4 / -39 -> -61, on the rim).
+    local rowY1 = -2
+    local rowY2 = rowY1 - topH - 4
     local MOVE_TOP = {
         { "Summon",  "summon",  "Summon all bots to you.",      primary = true },
         { "Follow",  "follow",  "All bots follow you." },
@@ -215,7 +217,9 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
         send("rti skull"); send("attack rti target")
         ns.MsgInfo("Skull RTI + attack.")
     end)
-    local skullTex = marksP.content:CreateTexture(nil, "OVERLAY")
+    -- On the button, not marksP.content: a parent region always draws under
+    -- its child frames, so the opaque stone fill hid the icon entirely.
+    local skullTex = skullBtn:CreateTexture(nil, "OVERLAY")
     skullTex:SetSize(14, 14)
     skullTex:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
     skullTex:SetTexCoord(0.75, 1, 0.25, 0.5) -- skull
@@ -226,7 +230,7 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
     moonBtn:SetScript("OnClick", function()
         send("rti cc moon"); ns.MsgInfo("Moon CC.")
     end)
-    local moonTex = marksP.content:CreateTexture(nil, "OVERLAY")
+    local moonTex = moonBtn:CreateTexture(nil, "OVERLAY")
     moonTex:SetSize(14, 14)
     moonTex:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcons")
     moonTex:SetTexCoord(0, 0.25, 0.25, 0.5) -- moon
@@ -339,7 +343,7 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
 
     -- TASKS.md §1.1: Atk only red. Stay/Fol/Flee stone with colored labels.
     local ACTION_TEXT_COLOR = {
-        stay   = { 1.00, 0.72, 0.12 }, -- amber
+        stay   = ns.Tokens.amber,          -- amber #ff9a00 (was off-token 1/.72/.12)
         follow = { 1.00, 0.82, 0.00 }, -- gold
         flee   = { 0.88, 0.29, 0.23 }, -- ink-red
     }
@@ -347,8 +351,10 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
     for ri, role in ipairs(ROLES) do
         local rowY  = -18 - (ri - 1) * (mCellH + 4)
         local lbl   = roleP.content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetPoint("TOPLEFT", roleP.content, "TOPLEFT", 4, rowY - 2)
+        -- Vertically centered on the 22px cell row (TOPLEFT -2 sat ~3px high).
+        lbl:SetPoint("LEFT", roleP.content, "TOPLEFT", 4, rowY - mCellH / 2)
         lbl:SetText(ROLE_LABELS[role])
+        lbl:SetTextColor(ns.Tokens.parchment[1], ns.Tokens.parchment[2], ns.Tokens.parchment[3])
 
         for ai, action in ipairs(ROLE_ACTIONS) do
             local x   = labelW + 8 + (ai - 1) * (mCellW + cellGap)

@@ -181,7 +181,7 @@ refreshTargetLine = function()
         local clsLabel = ""
         if cls ~= "" then
             local pretty = (cls:sub(1, 1) .. cls:sub(2):lower())
-            clsLabel = "  |cff808080" .. pretty .. "|r"
+            clsLabel = "  |cff9c8c66" .. pretty .. "|r"
         end
         state.targetLbl:SetText(nameColored .. clsLabel)
         if state.targetSub then
@@ -192,16 +192,16 @@ refreshTargetLine = function()
         local name = UnitName("target") or "?"
         local _, classTok = UnitClass("target")
         local nameColored = ns.ColorClass(classTok or "", name)
-        state.targetLbl:SetText(nameColored .. "  |cff808080live|r")
+        state.targetLbl:SetText(nameColored .. "  |cff9c8c66live|r")
         if state.targetSub then
             state.targetSub:SetText("CLICK [PICK] TO LOCK")
-            state.targetSub:SetTextColor(0.45, 0.40, 0.32, 1)
+            state.targetSub:SetTextColor(0.45, 0.38, 0.29, 1)
         end
     else
-        state.targetLbl:SetText("|cff808080no target|r")
+        state.targetLbl:SetText("|cff9c8c66no target|r")
         if state.targetSub then
             state.targetSub:SetText("TARGET A BOT, THEN CLICK PICK")
-            state.targetSub:SetTextColor(0.45, 0.40, 0.32, 1)
+            state.targetSub:SetTextColor(0.45, 0.38, 0.29, 1)
         end
     end
 end
@@ -346,6 +346,10 @@ local function ensureRow(idx, parent)
     local botTag = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     botTag:SetPoint("RIGHT", row, "RIGHT", -8, 0)
     botTag:SetJustifyH("RIGHT")
+    -- Bounded to the -64 gutter the line text leaves for it (52 + 8 = 60):
+    -- an unbounded 12-char bot name (~100px) ran left over the line text.
+    botTag:SetWidth(52)
+    botTag:SetWordWrap(false)
     botTag:Hide()
     row.botTag = botTag
 
@@ -690,7 +694,7 @@ refreshList = function()
             row.fs:SetText(item.name or "?")
             row.fs:SetTextColor(INK_RED[1], INK_RED[2], INK_RED[3], 1)
             row.botTag:SetText(string.format("id %d", item.id or 0))
-            row.botTag:SetTextColor(0.45, 0.40, 0.32, 1)
+            row.botTag:SetTextColor(0.45, 0.38, 0.29, 1)
             row.botTag:Show()
             row.lineIdx = i
             row:Show()
@@ -1033,7 +1037,9 @@ local function build()
     local f = CreateFrame("Frame", "WardenShieldFrame", UIParent)
     f:SetSize(FRAME_W, maxH)
     f:SetFrameStrata("HIGH")
-    f:SetFrameLevel(100)
+    -- Distinct base level per HUD (Sword 100 / Mantle 110 / Shield 120) so
+    -- overlapping HUDs never interleave their child levels.
+    f:SetFrameLevel(120)
     f:SetMovable(true)
     f:EnableMouse(true)
     f:SetClampedToScreen(true)
@@ -1076,15 +1082,19 @@ local function build()
     tlbl:SetPoint("TOPLEFT", targetRow, "TOPLEFT", PAD, -3)
     tlbl:SetWidth(FRAME_W - PAD * 2 - 56)
     tlbl:SetJustifyH("LEFT")
-    tlbl:SetText("|cff808080no target|r")
+    -- "<12-char name>  Deathknight" at GameFontNormalLarge is ~260px > 188;
+    -- wrapping pushed tsub below the 32px row onto the action buttons.
+    tlbl:SetWordWrap(false)
+    tlbl:SetText("|cff9c8c66no target|r")
     state.targetLbl = tlbl
 
     local tsub = targetRow:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     tsub:SetPoint("TOPLEFT", tlbl, "BOTTOMLEFT", 0, -1)
     tsub:SetWidth(FRAME_W - PAD * 2 - 56)
     tsub:SetJustifyH("LEFT")
+    tsub:SetWordWrap(false)
     tsub:SetText("TARGET A BOT, THEN CLICK PICK")
-    tsub:SetTextColor(0.45, 0.40, 0.32, 1)
+    tsub:SetTextColor(0.45, 0.38, 0.29, 1)
     state.targetSub = tsub
 
     local pick = ns.UI.Button.stone(targetRow, "Pick", 48, 18)
@@ -1220,6 +1230,7 @@ local function build()
     local filterLbl = filterRow:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     filterLbl:SetPoint("LEFT", filterRow, "LEFT", 8, 0)
     filterLbl:SetText("filter")
+    filterLbl:SetTextColor(GOLD_DIM[1], GOLD_DIM[2], GOLD_DIM[3], 1)
 
     local filterBox = CreateFrame("EditBox", "WardenShieldFilter", filterRow)
     filterBox:SetPoint("LEFT", filterLbl, "RIGHT", 6, 0)
@@ -1330,8 +1341,11 @@ local function build()
         -- the templated children only exist as globals with the full name.
         local upBtn   = sb.ScrollUpButton   or _G["WardenShieldScrollScrollBarScrollUpButton"]
         local downBtn = sb.ScrollDownButton or _G["WardenShieldScrollScrollBarScrollDownButton"]
-        if upBtn   then upBtn:Hide()   end
-        if downBtn then downBtn:Hide() end
+        -- Alpha 0 + mouse off: ScrollFrame_OnScrollRangeChanged re-Shows the
+        -- arrows on every list refresh, and Hide() alone would not stick.
+        for _, btn in pairs({ upBtn, downBtn }) do  -- pairs: skips a nil arrow
+            btn:Hide(); btn:SetAlpha(0); btn:EnableMouse(false)
+        end
         sb:ClearAllPoints()
         sb:SetPoint("TOPLEFT",    sf, "TOPRIGHT", 2, 0)
         sb:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 2, 0)

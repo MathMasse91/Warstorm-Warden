@@ -138,7 +138,7 @@ local function refreshTargetCard()
         s.levelText:SetText(tostring(level))
 
         s.nameLbl:SetText(ns.ColorClass(classTok or "", name))
-        s.metaLbl:SetText(string.format("- %s - %s",
+        s.metaLbl:SetText(string.format("\194\183 %s \194\183 %s",
             ns.ColorClass(classTok or "", className),
             faction ~= "" and faction or "Unknown"))
         s.hintLbl:SetText("whisper |cffffd100talents spec <name>|r + autogear -> tracked by GUID")
@@ -148,7 +148,7 @@ local function refreshTargetCard()
         s.portrait:SetTexture("Interface\\CharacterFrame\\TempPortrait")
         s.portraitBorder:Hide()
         s.levelBadge:Hide()
-        s.nameLbl:SetText("|cff808080no target|r")
+        s.nameLbl:SetText("|cff9c8c66no target|r")
         s.metaLbl:SetText("")
         s.hintLbl:SetText("target a player to see spec tiles")
     end
@@ -227,6 +227,7 @@ local function rebuildTilesFor(classToken)
 
             local sub = tile:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
             sub:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -2)
+            sub:SetTextColor(0.61, 0.55, 0.40)  -- mock #9c8c66 (not template gray)
             tile.subLbl = sub
 
             -- 22x22 icon slot (top-right corner)
@@ -454,7 +455,7 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
 
     local nameLbl = cardPanel.content:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     nameLbl:SetPoint("TOPLEFT", targetHdr, "BOTTOMLEFT", 0, -2)
-    nameLbl:SetText("|cff808080no target|r")
+    nameLbl:SetText("|cff9c8c66no target|r")
     tabState.nameLbl = nameLbl
 
     local metaLbl = cardPanel.content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -464,6 +465,7 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
 
     local hintLbl = cardPanel.content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hintLbl:SetPoint("TOPLEFT", nameLbl, "BOTTOMLEFT", 0, -4)
+    hintLbl:SetTextColor(0.61, 0.55, 0.40)  -- mock #9c8c66
     hintLbl:SetText("target a player to see spec tiles")
     tabState.hintLbl = hintLbl
 
@@ -509,7 +511,7 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     -- UI tweak: anchor the action row BELOW the Target panel (in the gap
     -- between the two brown blocks) instead of inside it. cardPanel stays
     -- fixed; SPECS_GAP is widened below to give the row breathing room.
-    local prevBtn = makeSecureStoneBtn(cardPanel, "< prev target", 100, 20)
+    local prevBtn = makeSecureStoneBtn(cardPanel, "< prev target", 100, 22)
     prevBtn:SetPoint("TOPLEFT", cardPanel, "BOTTOMLEFT", 4, -6)
     prevBtn:SetAttribute("type", "macro")
     prevBtn:SetAttribute("macrotext", "/targetlasttarget")
@@ -519,7 +521,7 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     -- SecureActionButton whose macrotext is pre-assigned to `/target <name>`
     -- out of combat; clicking fires the protected call through the secure
     -- path (no taint).
-    local histBtn = ns.UI.Button.stone(cardPanel, "History", 78, 20)
+    local histBtn = ns.UI.Button.stone(cardPanel, "History", 78, 22)
     histBtn:SetPoint("LEFT", prevBtn, "RIGHT", 4, 0)
     tabState.histBtn = histBtn
 
@@ -568,7 +570,7 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
         histPop:SetHeight(8 + math.max(1, n) * 20)
         if n == 0 then
             local r = tabState.histPopRows[1]
-            if r:GetFontString() then r:GetFontString():SetText("|cff808080(empty)|r") end
+            if r:GetFontString() then r:GetFontString():SetText("|cff9c8c66(empty)|r") end
             r:Show()
             -- Don't let a click fire when empty.
             r:SetAttribute("macrotext", "")
@@ -621,14 +623,14 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
 
     -- Autogear / Buffs (right side) - anchored below cardPanel like the pair
     -- on the left, so all four buttons sit on the same baseline in the gap.
-    local buffsBtn = ns.UI.Button.stone(cardPanel, "World Buffs", 110, 20)
+    local buffsBtn = ns.UI.Button.stone(cardPanel, "World Buffs", 110, 22)
     buffsBtn:SetPoint("TOPRIGHT", cardPanel, "BOTTOMRIGHT", -4, -6)
     buffsBtn:SetScript("OnClick", function()
         ns.Broadcast("nc +worldbuff")
         ns.MsgInfo("Broadcast `nc +worldbuff` to " .. ns.Channel() .. ".")
     end)
 
-    local autogearBtn = ns.UI.Button.stone(cardPanel, "Autogear", 110, 20)
+    local autogearBtn = ns.UI.Button.stone(cardPanel, "Autogear", 110, 22)
     autogearBtn:SetPoint("RIGHT", buffsBtn, "LEFT", -4, 0)
     autogearBtn:SetScript("OnClick", function()
         -- Group channel: hardcoded PARTY only reached your own raid subgroup.
@@ -678,9 +680,9 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     -- ============================================================
     -- UI-01: the action row (< prev target / history / autogear / buffs)
     -- is now anchored BELOW cardPanel, so SPECS_GAP has to hold 6px top
-    -- margin + 20px button + 6px bottom margin = 32px. Previously 16px
-    -- when the buttons lived inside cardPanel.content.
-    local SPECS_GAP = 32
+    -- margin + 22px button (mock height) + 6px bottom margin = 34px.
+    -- Previously 16px when the buttons lived inside cardPanel.content.
+    local SPECS_GAP = 34
     local specsH = paneH - cardH - (SPECS_GAP + 10)
     local specsPanel = ns.UI.Panel.Create(pane, paneW - 16, specsH, "Specs")
     specsPanel:SetPoint("TOPLEFT", cardPanel, "BOTTOMLEFT", 0, -SPECS_GAP)
@@ -688,7 +690,7 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
 
     -- "N available" meta in panel header
     local countLbl = specsPanel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    countLbl:SetPoint("TOPRIGHT", specsPanel, "TOPRIGHT", -6, -4)
+    countLbl:SetPoint("TOPRIGHT", specsPanel, "TOPRIGHT", -8, -4)  -- = header x / rule end
     countLbl:SetTextColor(0.61, 0.55, 0.40)
     tabState.countLbl = countLbl
 

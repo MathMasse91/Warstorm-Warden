@@ -64,7 +64,7 @@ end
 
 local function buildHeader(parent)
     return ns.UI.HudChrome.BuildHeader(parent, {
-        title   = "WARDEN MANTLE", hint = "/wm",
+        title   = "WARDENMANTLE", hint = "/wm",  -- one word, like WARDENSWORD / WARDENSHIELD
         height  = HEADER_H, pad = PAD,
         onClose = function() ns.WardenMantle.Hide() end,
         onLock  = function() ns.WardenMantle.ToggleLock() end,
@@ -227,7 +227,7 @@ local function buildBody()
     local p = CreateFrame("Frame", nil, frame)
     p:SetSize(PORTRAIT, PORTRAIT)
     p:SetBackdrop(ns.UI.FLAT_BACKDROP)
-    p:SetBackdropColor(0.11, 0.08, 0.05, 1)
+    p:SetBackdropColor(ns.Tokens.stone_mid[1], ns.Tokens.stone_mid[2], ns.Tokens.stone_mid[3], 1)
     p:SetBackdropBorderColor(ns.Tokens.gold_rim[1], ns.Tokens.gold_rim[2], ns.Tokens.gold_rim[3], 1)
     local ptex = p:CreateTexture(nil, "ARTWORK")
     ptex:SetPoint("TOPLEFT",     p, "TOPLEFT",      1, -1)
@@ -237,6 +237,9 @@ local function buildBody()
 
     local nameLbl = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     nameLbl:SetJustifyH("LEFT")
+    -- Bounded to ~152px by its TOPLEFT+RIGHT anchors; a 12-char wide-glyph
+    -- name would wrap to a 2nd line and push subLbl past the 30px portrait.
+    nameLbl:SetWordWrap(false)
     frame.nameLbl = nameLbl
 
     local subLbl = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -401,7 +404,7 @@ ns.WardenMantle.Refresh = Refresh
 local function applyPosition()
     local s = mt()
     ns.UI.HudChrome.ApplyPosition(frame, s and s.pos,
-        { point = "TOPRIGHT", x = -300, y = -120 })
+        { point = "TOPRIGHT", x = -320, y = -120 })  -- clears Sword's 270px "normal" width at x=-40
 end
 
 local function storePosition()
@@ -417,7 +420,10 @@ local function build()
     if frame then return frame end
     frame = CreateFrame("Frame", "WardenMantleFrame", UIParent)
     frame:SetFrameStrata("HIGH")
-    frame:SetFrameLevel(100)
+    -- Distinct base level per HUD (Sword 100 / Mantle 110 / Shield 120): at a
+    -- shared 100 their child buttons (101-105) interleaved wherever two HUDs
+    -- overlapped, so one HUD's backdrop/buttons could cover the other's.
+    frame:SetFrameLevel(110)
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:SetClampedToScreen(true)

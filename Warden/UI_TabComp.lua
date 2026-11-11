@@ -262,6 +262,7 @@ buildSlotWidget = function(parent, index)
     -- Spec subtitle (muted, below class label)
     local specLbl = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     specLbl:SetPoint("LEFT", iconTex, "RIGHT", 4, -8)
+    specLbl:SetTextColor(0.61, 0.55, 0.40)  -- mock #9c8c66 (not template gray)
     specLbl:SetPoint("RIGHT", f, "RIGHT", -4, 0)
     specLbl:SetJustifyH("LEFT")
     specLbl:SetWordWrap(false)
@@ -453,14 +454,23 @@ refreshSlotWidget = function(f, slot)
         f.specLbl:SetText(slot.spec or "?")
         f.emptyLbl:Hide()
         f.classLbl:Show(); f.specLbl:Show()
-        if slot.isPlayer then f.pBadge:Show() else f.pBadge:Hide() end
+        -- Keep the class label clear of the top-right P badge when shown.
+        f.classLbl:ClearAllPoints()
+        f.classLbl:SetPoint("LEFT", f.iconTex, "RIGHT", 4, 4)
+        if slot.isPlayer then
+            f.pBadge:Show()
+            f.classLbl:SetPoint("RIGHT", f.pBadge, "LEFT", -2, 0)
+        else
+            f.pBadge:Hide()
+            f.classLbl:SetPoint("RIGHT", f, "RIGHT", -4, 0)
+        end
     else
         f:SetBackdropColor(0.08, 0.06, 0.04, 0.8)
         if isSelected then
             f:SetBackdropBorderColor(1, 0.82, 0, 1)
         else
             -- Dashed-border effect: use a slightly lighter color than filled slots
-            f:SetBackdropBorderColor(0.28, 0.22, 0.15, 1)
+            f:SetBackdropBorderColor(ns.Tokens.stone_rim[1], ns.Tokens.stone_rim[2], ns.Tokens.stone_rim[3], 1)  -- mock #3a2f22
         end
         f.bar:Hide()
         f.iconTex:Hide()
@@ -1668,7 +1678,9 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     sideScroll:SetPoint("BOTTOMRIGHT", sidePanel.content, "BOTTOMRIGHT", -22, 0)
 
     local sideChild = CreateFrame("Frame", "WardenCompSideChild", sideScroll)
-    sideChild:SetSize(sidebarW - 28, 10)
+    -- Match the scroll frame's width (sidePanel.content 248 - 22 = 226) so the
+    -- right edge of Slot Detail isn't clipped.
+    sideChild:SetSize(sidebarW - 34, 10)
     sideScroll:SetScrollChild(sideChild)
 
     -- --- Section 1: Slot detail (no inner panel, just stacked widgets) ---
@@ -1707,7 +1719,7 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     covHost:SetBackdropBorderColor(0.72, 0.58, 0.21, 0.55) -- gold-dim rim = "its own square"
 
     local covHeader = covHost:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    covHeader:SetPoint("TOPLEFT", covHost, "TOPLEFT", 8, -5)
+    covHeader:SetPoint("TOPLEFT", covHost, "TOPLEFT", 8, -4)  -- same as Panel.Create header
     covHeader:SetText("COVERAGE")
     covHeader:SetTextColor(1, 0.82, 0)
 
@@ -1715,7 +1727,7 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     covRule:SetTexture("Interface\\Buttons\\WHITE8x8")
     covRule:SetVertexColor(0.72, 0.58, 0.21, 0.35)
     covRule:SetHeight(1)
-    covRule:SetPoint("TOPLEFT", covHeader, "BOTTOMLEFT", 0, -3)
+    covRule:SetPoint("TOPLEFT", covHeader, "BOTTOMLEFT", 0, -2)
     covRule:SetPoint("RIGHT",   covHost,   "RIGHT",     -8, 0)
 
     do
@@ -1726,7 +1738,9 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
         local cellH   = 17
         local gap     = 3
         local pad     = 6
-        local contentW = sidebarW - 2 * pad - 12  -- minus rim + scrollbar room
+        -- covHost spans sidePanel.content minus 4px each side (= sidebarW - 20);
+        -- keep the same `pad` on the right so the last column clears the rim.
+        local contentW = sidebarW - 20 - 2 * pad
         local colW = math.floor((contentW - (COLS - 1) * gap) / COLS)
         local topY = -22                          -- below header + rule
         for i, item in ipairs(items) do
@@ -2207,7 +2221,9 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
 
     -- Stop: aborts an in-progress Build by wiping the summon / spec / whisper
     -- queues (ns.Engine.Stop). Rightmost of the group.
-    local stopBtn = ns.UI.Button.warn(pane, "Stop Build", ACT_BTN_W, ACT_BTN_H)
+    -- Parented to actionBar (not pane): as pane children they shared
+    -- actionBar's frame level, so its 55% bg could draw over them.
+    local stopBtn = ns.UI.Button.warn(actionBar, "Stop Build", ACT_BTN_W, ACT_BTN_H)
     stopBtn:SetPoint("BOTTOMRIGHT", actionBar, "BOTTOMRIGHT", -6, 6)
     stopBtn:SetScript("OnClick", function()
         if ns.Engine and ns.Engine.Stop then
@@ -2221,7 +2237,7 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
     -- always behind a confirm. NOTE: a full role-based raid re-sort is not part
     -- of this chain yet (that's the separate sort feature); the build still
     -- auto-moves the player to their [P] slot.
-    local createBtn = ns.UI.Button.red(pane, "Create", ACT_BTN_W, ACT_BTN_H)
+    local createBtn = ns.UI.Button.red(actionBar, "Create", ACT_BTN_W, ACT_BTN_H)
     createBtn:SetPoint("RIGHT", stopBtn, "LEFT", -ACT_GAP, 0)
     createBtn:SetScript("OnClick", function()
         local plan = readPlan()
@@ -2235,7 +2251,7 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
 
     -- Build: the primary build kickoff, moved down from the sidebar so it sits
     -- in the action group. Reuses runBuild from above.
-    local buildBtn = ns.UI.Button.red(pane, "Build", ACT_BTN_W, ACT_BTN_H)
+    local buildBtn = ns.UI.Button.red(actionBar, "Build", ACT_BTN_W, ACT_BTN_H)
     buildBtn:SetPoint("RIGHT", createBtn, "LEFT", -ACT_GAP, 0)
     local buildFS = buildBtn:GetFontString()
     if buildFS then buildFS:SetTextColor(1.00, 0.92, 0.75) end
@@ -2255,9 +2271,11 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
 
     -- Status line (muted) - left of the action row, vertically centered on the
     -- button cluster so the row reads as one band.
-    local statusLbl = pane:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    -- On actionBar: a pane-level region sits under actionBar's 55% bg.
+    local statusLbl = actionBar:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     statusLbl:SetPoint("LEFT", actionBar, "BOTTOMLEFT", 8, 6 + ACT_BTN_H / 2)
     statusLbl:SetText("Queue: 0   Pending: 0")
+    statusLbl:SetTextColor(0.61, 0.55, 0.40)  -- mock #9c8c66
 
     pane._statusAccum = 0
     pane:SetScript("OnUpdate", function(self, elapsed)
