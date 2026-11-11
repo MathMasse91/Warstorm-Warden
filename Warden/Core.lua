@@ -873,7 +873,8 @@ local _RT_COLORS = {
 function ns.UI.RichText.Format(s)
     if type(s) ~= "string" then return "" end
     s = s:gsub("||", "\1")
-    s = s:gsub("|(%w+)%[([^%]]*)%]|", function(tag, body)
+    -- Lazy body up to the first "]|" so a body may hold brackets: |kbd[[P] off]|
+    s = s:gsub("|(%w+)%[(.-)%]|", function(tag, body)
         local c = _RT_COLORS[tag]
         if not c then return "|" .. tag .. "[" .. body .. "]|" end
         return "|cff" .. c .. body .. "|r"
