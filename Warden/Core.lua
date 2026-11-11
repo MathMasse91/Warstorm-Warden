@@ -896,7 +896,7 @@ StaticPopupDialogs["WARDEN_CONFIRM_CLEANUP"] = {
 }
 
 StaticPopupDialogs["WARDEN_CONFIRM_HARD_RESPEC"] = {
-    text         = "HARD ReSpec all bots at %s gear?\n(sends .warstormbot bot init=%s - re-rolls gear AND talents)",
+    text         = "HARD ReSpec all bots at %s gear?\n(sends .warstormbot bot init=%s - re-rolls gear AND talents)\n\nEvery bot's spec is re-rolled at RANDOM.\nRun Roster > Re-Spec All Tracked afterwards.",
     button1      = YES, button2 = NO, timeout = 0,
     whileDead    = true, hideOnEscape = true,
     OnAccept     = function()

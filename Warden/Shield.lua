@@ -1135,7 +1135,7 @@ local function build()
     clear:SetPoint("RIGHT", actRow, "RIGHT", -PAD, 0)
     clear:SetScript("OnClick", function() ns.Shield.Clear() end)
     ns.UI.Tooltip.Attach(clear, "clear",
-        "Wipe the captured list and stop listening. The target stays locked.",
+        "Wipe the captured list, stop listening and unlock the target.",
         "ANCHOR_TOP")
 
     -- Segmented mode control (replaces the 5-button row)
@@ -1420,7 +1420,7 @@ function ns.Shield.PrintHelp()
         { "/wsh show|hide",  "explicit show / hide" },
         { "/wsh lock|unlock","lock or unlock position" },
         { "/wsh reset",      "reset position" },
-        { "/wsh clear",      "wipe captured list" },
+        { "/wsh clear",      "wipe captured list, unlock target" },
         { "/wsh los",        "send `los` to the current target" },
         { "/wsh spells",     "send `spells` to the current target" },
         { "/wsh help",       "this list" },

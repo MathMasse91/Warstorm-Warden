@@ -455,7 +455,7 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
     addTooltip(resetAIBtn, "Reset AI",
         "Sends `reset botAI` to the group: every bot's strategies go back to defaults. Asks first.", "ANCHOR_TOP")
     addTooltip(hardBtn, "Hard ReSpec",
-        "Sends `.warstormbot bot init=<rarity>` (rarity from BOT INIT): re-rolls ALL bots' gear and talents. Asks first.", "ANCHOR_TOP")
+        "Sends `.warstormbot bot init=<rarity>` (rarity from BOT INIT): re-rolls ALL bots' gear, and every bot's spec is re-rolled at random. Run Roster > Re-Spec All Tracked afterwards. Asks first.", "ANCHOR_TOP")
     addTooltip(cleanupBtn, "Cleanup",
         "Sends `.warstormbot bot remove *`: despawns every bot. Asks first.", "ANCHOR_TOP")
 
