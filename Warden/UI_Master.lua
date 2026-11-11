@@ -43,6 +43,19 @@ local function showTab(index)
             built[index] and "Y" or "N")
     end
 
+    -- The Spec pane holds SecureActionButtons, which makes it protected: in
+    -- combat its Show()/Hide() is blocked, so a tab switch would leave it
+    -- painted under (or instead of) the new tab. Refuse the switch instead.
+    if InCombatLockdown and InCombatLockdown() then
+        for i, p in ipairs(panes) do
+            local flips = (i == index) ~= (p:IsShown() and true or false)
+            if flips and p.IsProtected and p:IsProtected() then
+                if ns.MsgWarn then ns.MsgWarn("Can't switch to/from the Spec tab in combat - try again after combat.") end
+                return
+            end
+        end
+    end
+
     for i, p in ipairs(panes) do
         if i == index then p:Show() else p:Hide() end
     end

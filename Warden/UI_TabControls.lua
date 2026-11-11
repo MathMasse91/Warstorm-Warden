@@ -367,8 +367,10 @@ function ns.UI.Tabs.Controls.BuildInto(pane)
             b:SetPoint("TOPLEFT", roleP.content, "TOPLEFT", x, rowY)
             b:RegisterForClicks("LeftButtonUp")
             b:SetScript("OnClick", function() send(cmd) end)
+            -- Body as a function: ns.Channel() flips PARTY -> RAID when the
+            -- group converts, and a build-time string went stale.
             addTooltip(b, ACTION_LABEL[action] .. " " .. ROLE_LABELS[role],
-                "Sends `" .. cmd .. "` to " .. ns.Channel() .. ".")
+                function() return "Sends `" .. cmd .. "` to " .. ns.Channel() .. "." end)
         end
     end
 

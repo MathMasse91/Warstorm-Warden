@@ -1541,6 +1541,15 @@ end
 function ns.UI.Tabs.Comp.BuildInto(pane)
     applySizeLayout(25)
 
+    -- Esc / tab switch mid-drag: the ghost lives on UIParent at TOOLTIP
+    -- strata, so without this it kept tracking the cursor over the game.
+    pane:HookScript("OnHide", function()
+        if not state.drag and not (state.dragGhost and state.dragGhost:IsShown()) then return end
+        state.drag = nil
+        if state.dragGhost then state.dragGhost:Hide() end
+        state.highlightDropTargets(false)
+    end)
+
     local PW = pane:GetWidth()
 
     -- ============================================================

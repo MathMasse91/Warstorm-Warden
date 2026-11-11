@@ -576,6 +576,12 @@ function ns.UI.Tabs.Spec.BuildInto(pane)
     end
 
     histBtn:SetScript("OnClick", function()
+        -- histPop parents secure rows, so its Show/Hide is blocked in combat
+        -- (ADDON_ACTION_BLOCKED). It is already hidden at PLAYER_REGEN_DISABLED.
+        if inCombat() then
+            ns.MsgWarn("Target history is unavailable in combat.")
+            return
+        end
         if histPop:IsShown() then
             histPop:Hide()
             return
