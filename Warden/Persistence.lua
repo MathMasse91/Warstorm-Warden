@@ -53,7 +53,9 @@ local function initDB()
     if type(sw.pos)                ~= "table"   then sw.pos                = nil end
     if type(sw.locked)             ~= "boolean" then sw.locked             = false end
     if type(sw.hidden)             ~= "boolean" then sw.hidden             = false end
-    if type(sw.autoShowCombat)     ~= "boolean" then sw.autoShowCombat     = true end
+    -- Auto-show removed: the HUD never opens by itself. Key kept (forced
+    -- false) so old SavedVariables stay harmless.
+    sw.autoShowCombat = false
     if type(sw.showStatus)         ~= "boolean" then sw.showStatus         = true end
     if type(sw.showRoles)          ~= "boolean" then sw.showRoles          = true end
     if type(sw.startLocked)        ~= "boolean" then sw.startLocked        = false end

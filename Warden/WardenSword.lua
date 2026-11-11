@@ -364,10 +364,6 @@ local function storePosition()
     if pos then s.pos = pos end
 end
 
--- Session-only: true after the user closes the HUD, so auto-show on combat
--- start doesn't reopen it.
-local dismissed = false
-
 local function build()
     if frame then return frame end
     frame = CreateFrame("Frame", "WardenSwordFrame", UIParent)
@@ -417,22 +413,8 @@ local function build()
         paintToggles()
     end)
 
-    -- Combat hook: auto-show on combat start when the user opted in.
-    -- A prior "keep shown 10s then fade" branch was unfinished (dead code);
-    -- dropped. Users close the HUD manually or via /ws hide.
-    frame:RegisterEvent("PLAYER_REGEN_DISABLED")
-    frame:SetScript("OnEvent", function(self, event)
-        local s = sw(); if not s then return end
-        -- Opt-in pop-up when combat starts. (The old `not s.hidden` guard made
-        -- this a no-op: s.hidden is only false while the HUD is already shown.)
-        -- A manual close (x, /ws hide, toggle) is respected until the next
-        -- manual open or /reload.
-        if event == "PLAYER_REGEN_DISABLED"
-           and s.autoShowCombat and not dismissed and not self:IsShown() then
-            if ns.Debug then ns.Debug("sword", "auto-show on combat start") end
-            ns.WardenSword.Show()
-        end
-    end)
+    -- No auto-show of any kind (combat, login, reload): the HUD opens only
+    -- on an explicit user action (/ws, keybind, minimap middle-click).
 
     applyPosition()
     layout()
@@ -476,18 +458,21 @@ end
 function ns.WardenSword.Frame() return frame end
 
 function ns.WardenSword.Show()
-    dismissed = false
     if ns.Debug then ns.Debug("sword", "Show") end
     if not frame then build() end
     frame:Show()
     local s = sw(); if s then s.hidden = false end
+    -- Paint now: the 0.5s ticker only runs while shown, so a fresh open
+    -- showed an empty status strip and stale BL / AoE / Burn colors.
+    ns.WardenSword.RefreshStatus()
+    ns.WardenSword.RefreshBLButton()
+    paintToggles()
 end
 
 function ns.WardenSword.Hide()
     if ns.Debug then ns.Debug("sword", "Hide") end
     if not frame then return end
     frame:Hide()
-    dismissed = true
     local s = sw(); if s then s.hidden = true end
 end
 
@@ -658,7 +643,9 @@ ns.Persistence.OnReady(function()
         -- SetLocked (not a bare assignment) so the header lock glyph, drawn by
         -- build() before this runs, is refreshed to match.
         if s.startLocked and not s.locked then ns.WardenSword.SetLocked(true) end
-        if s.hidden then frame:Hide() else frame:Show() end
     end
+    -- Always start closed: never reopen at login / /reload, even if the HUD
+    -- was open last session. Only an explicit /ws (or keybind/minimap) opens it.
+    frame:Hide()
     ns.WardenSword.ApplyAlpha()
 end)

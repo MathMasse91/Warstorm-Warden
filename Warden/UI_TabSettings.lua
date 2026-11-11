@@ -217,7 +217,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     local sw = db.sword or {}
     db.sword = sw
 
-    local swordP = ns.UI.Panel.Create(content, contentW - 16, 180, "WardenSword")
+    local swordP = ns.UI.Panel.Create(content, contentW - 16, 156, "WardenSword")
     swordP:SetPoint("TOPLEFT", statsP, "BOTTOMLEFT", 0, -6)
 
     -- Same thin adapter on ns.UI.Check.Make, driving the sword sub-table.
@@ -232,20 +232,19 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
         return cb
     end
 
-    mkSwordCheck("Auto-show in combat",      4,  -2, "autoShowCombat", "ApplyLayout",
-        "Pop the HUD open automatically when combat starts.")
+    -- No "Auto-show in combat" option: the HUD only ever opens on request.
+    mkSwordCheck("Show status strip",        4,  -2, "showStatus",     "ApplyLayout",
+        "Live row under the header with BOTS / AoE / BL / Queue.")
     mkSwordCheck("Show role commands row", 220, -2, "showRoles",      "ApplyLayout",
         "TANK / HEAL / DPS rows for quick attack / stay orders.")
-    mkSwordCheck("Show status strip",        4, -26, "showStatus",     "ApplyLayout",
-        "Live row under the header with BOTS / AoE / BL / Queue.")
-    mkSwordCheck("Start locked",           220, -26, "startLocked",    nil,
+    mkSwordCheck("Start locked",             4, -26, "startLocked",    nil,
         "Apply the lock at login so accidental drags don't happen mid-fight.")
-    mkSwordCheck("Hide Warden minimap button in combat", 4, -50, "hideMinimapCombat", nil,
+    mkSwordCheck("Hide Warden minimap button in combat", 220, -26, "hideMinimapCombat", nil,
         "Hides the main minimap button when combat starts so it can't be mis-clicked.")
 
     -- Density dropdown
     local densLbl = swordP.content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    densLbl:SetPoint("TOPLEFT", swordP.content, "TOPLEFT", 4, -80)
+    densLbl:SetPoint("TOPLEFT", swordP.content, "TOPLEFT", 4, -56)
     densLbl:SetText("DENSITY")
     densLbl:SetTextColor(0.72, 0.58, 0.21, 1)
 
@@ -276,7 +275,7 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     -- Transparency slider (0.15 to 1.00). Applies live via SetAlpha on the
     -- HUD frame so the user can dial in the perfect blend with the game UI.
     local alphaLbl = swordP.content:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    alphaLbl:SetPoint("TOPLEFT", swordP.content, "TOPLEFT", 140, -80)
+    alphaLbl:SetPoint("TOPLEFT", swordP.content, "TOPLEFT", 140, -56)
     alphaLbl:SetText("TRANSPARENCY")
     alphaLbl:SetTextColor(0.72, 0.58, 0.21, 1)
 
@@ -301,8 +300,8 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
     end)
 
     -- Action buttons
-    local resetHud = ns.UI.Button.stone(swordP.content, "Reset HUD position", 160, 20)
-    resetHud:SetPoint("TOPLEFT", swordP.content, "TOPLEFT", 4, -130)
+    local resetHud = ns.UI.Button.stone(swordP.content, "Reset HUD position", 160, 22)
+    resetHud:SetPoint("TOPLEFT", swordP.content, "TOPLEFT", 4, -106)
     resetHud:SetScript("OnClick", function()
         if ns.WardenSword and ns.WardenSword.ResetPosition then
             ns.WardenSword.ResetPosition()
@@ -397,6 +396,6 @@ function ns.UI.Tabs.Settings.BuildInto(pane)
 
     -- Final scroll-child height: sum of panel heights + 6 px gaps + 4 px top
     -- margin + 8 px bottom padding. Keep in sync if panel heights change.
-    content:SetHeight(4 + 130 + 6 + 302 + 6 + 70 + 6 + 180 + 6 + 96 + 6 + 80 + 8)
+    content:SetHeight(4 + 130 + 6 + 312 + 6 + 70 + 6 + 156 + 6 + 96 + 6 + 80 + 8)
 end
 
