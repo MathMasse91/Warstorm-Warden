@@ -88,13 +88,17 @@ local function buildChatCompLines(slots, size, compName, classOrder, classLabel)
         end
     end
 
+    -- A lone "|" is a WoW escape: SendChatMessage rejects the whole line with
+    -- "Invalid escape code in chat message". Strip pipes from the typed name
+    -- and never use one as the class separator.
+    if compName then compName = string.gsub(compName, "|", "") end
     local prefix = "Warden Comp"
     if compName and compName ~= "" then prefix = prefix .. " [" .. compName .. "]" end
     prefix = prefix .. " (" .. filled .. "/" .. (size or 25) .. "): "
 
     local lines, current = {}, prefix
     for _, seg in ipairs(segments) do
-        local candidate = (current == prefix) and (current .. seg) or (current .. " | " .. seg)
+        local candidate = (current == prefix) and (current .. seg) or (current .. " - " .. seg)
         if #candidate > 255 and current ~= prefix then
             table.insert(lines, current)
             current = seg
@@ -1817,7 +1821,7 @@ function ns.UI.Tabs.Comp.BuildInto(pane)
         ToggleDropDownMenu(1, nil, chatDrop, self, 0, 0)
     end)
     ns.UI.Tooltip.Attach(chatBtn, "Post comp to chat",
-        "Posts the grid as readable text (e.g. \"Priest: 2 Disc | ...\") to the channel you pick. Long comps split between classes to fit the chat limit. Your [P] slot is left out.",
+        "Posts the grid as readable text (e.g. \"Priest: 2 Disc - ...\") to the channel you pick. Long comps split between classes to fit the chat limit. Your [P] slot is left out.",
         "ANCHOR_TOP")
 
     -- buildBtn itself is created in the bottom action row (see below); its
